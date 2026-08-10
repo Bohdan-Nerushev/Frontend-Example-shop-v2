@@ -46,4 +46,31 @@ export const customerApi = {
     const response = await http.put<CustomerResponse>(`/v1/customers/${customerId}/communication-details`, data)
     return response.data
   },
+
+  /**
+   * Activate the customer profile.
+   * Endpoint: PUT /v1/shop/customers/{customerId}/activate
+   */
+  async activateCustomer(customerId: string): Promise<CustomerResponse> {
+    const response = await http.put<CustomerResponse>(`/v1/shop/customers/${customerId}/activate`)
+    return response.data
+  },
+
+  /**
+   * Deactivate the customer profile.
+   * Endpoint: PUT /v1/customers/{customerId}/deactivate
+   */
+  async deactivateCustomer(customerId: string): Promise<CustomerResponse> {
+    const response = await http.put<CustomerResponse>(`/v1/customers/${customerId}/deactivate`)
+    return response.data
+  },
+
+  /**
+   * Delete the customer profile permanently.
+   * Endpoint: DELETE /v1/shop/customers/{customerId}
+   */
+  async deleteCustomer(customerId: string): Promise<void> {
+    await http.delete(`/v1/shop/customers/${customerId}`)
+  },
 }
+

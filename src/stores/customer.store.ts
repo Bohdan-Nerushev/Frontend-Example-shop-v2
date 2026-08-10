@@ -105,6 +105,61 @@ export const useCustomerStore = defineStore('customer', () => {
     }
   }
 
+  const activate = async () => {
+    if (!customer.value) return
+    loading.value = true
+    error.value = null
+    try {
+      customer.value = await customerApi.activateCustomer(customer.value.id)
+      notificationStore.success('Profile activated successfully!')
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } } }
+      const errMsg = axiosError.response?.data?.message || 'Failed to activate profile'
+      error.value = errMsg
+      notificationStore.error(errMsg)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const deactivate = async () => {
+    if (!customer.value) return
+    loading.value = true
+    error.value = null
+    try {
+      customer.value = await customerApi.deactivateCustomer(customer.value.id)
+      notificationStore.success('Profile deactivated successfully!')
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } } }
+      const errMsg = axiosError.response?.data?.message || 'Failed to deactivate profile'
+      error.value = errMsg
+      notificationStore.error(errMsg)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const deleteProfile = async () => {
+    if (!customer.value) return
+    loading.value = true
+    error.value = null
+    try {
+      await customerApi.deleteCustomer(customer.value.id)
+      customer.value = null
+      notificationStore.success('Profile deleted successfully!')
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } } }
+      const errMsg = axiosError.response?.data?.message || 'Failed to delete profile'
+      error.value = errMsg
+      notificationStore.error(errMsg)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     customer,
     loading,
@@ -115,5 +170,9 @@ export const useCustomerStore = defineStore('customer', () => {
     updateAddress,
     updateInvoiceAddress,
     updateCommunication,
+    activate,
+    deactivate,
+    deleteProfile,
   }
 })
+
