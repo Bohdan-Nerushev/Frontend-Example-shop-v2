@@ -5,11 +5,11 @@ import { ref } from 'vue'
  */
 export function useForm<T extends Record<string, any>>(
   initialState: T,
-  validateFn?: (values: T) => Partial<Record<keyof T, string>>
+  validateFn?: (values: T) => Partial<Record<keyof T, any>>
 ) {
   // Deep copy the initial state to prevent mutating reference
   const form = ref<T>({ ...initialState })
-  const errors = ref<Partial<Record<keyof T, string>>>({})
+  const errors = ref<Partial<Record<keyof T, any>>>({})
   const isSubmitting = ref(false)
 
   /**
