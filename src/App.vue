@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
-import TheWelcome from './components/TheWelcome.vue'
+import { useAuth } from './auth/useAuth'
+
+const { login, logout, isAuthenticated, token } = useAuth()
+
 </script>
 
 <template>
   <header>
-    <img alt="Vue logo" class="logo" src="./assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-    </div>
+    <nav v-if="isAuthenticated">
+      <button @click="logout">Logout</button>
+    </nav>
+    <nav v-else>
+      <button @click="login">Login</button>
+    </nav>
   </header>
 
   <main>
-    <TheWelcome />
+    <div v-if="isAuthenticated">
+      <pre>{{ token }}</pre>
+    </div>
   </main>
 </template>
 
