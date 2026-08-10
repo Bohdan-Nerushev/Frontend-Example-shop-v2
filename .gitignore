@@ -41,3 +41,10 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+#Vscode / IDEA
+.vscode
+.vscode/
+.vscode/*
+.idea/
+.idea/*
