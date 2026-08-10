@@ -47,6 +47,11 @@ export const useAuthStore = defineStore('auth', () => {
 
   const initAuth = (): Promise<boolean> => {
     return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.warn('Keycloak initialization timed out (3s). Proceeding in offline mode.')
+        resolve(false)
+      }, 3000)
+
       keycloak
         .init({
           onLoad: 'check-sso',
@@ -54,12 +59,14 @@ export const useAuthStore = defineStore('auth', () => {
           pkceMethod: 'S256',
         })
         .then((authenticated) => {
+          clearTimeout(timeout)
           if (authenticated && keycloak.token && keycloak.refreshToken) {
             setToken(keycloak.token, keycloak.refreshToken)
           }
           resolve(authenticated)
         })
         .catch((error) => {
+          clearTimeout(timeout)
           console.error('Keycloak initialization failed', error)
           reject(error)
         })

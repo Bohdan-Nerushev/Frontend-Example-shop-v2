@@ -1,52 +1,45 @@
 <script setup lang="ts">
 import { useAuth } from './auth/useAuth'
 
-const { login, logout, isAuthenticated, token } = useAuth()
-
+const { login, logout, isAuthenticated, username } = useAuth()
 </script>
 
 <template>
-  <header>
-    <nav v-if="isAuthenticated">
-      <button @click="logout">Logout</button>
-    </nav>
-    <nav v-else>
-      <button @click="login">Login</button>
-    </nav>
+  <header class="app-header">
+    <div class="header-container">
+      <div class="logo-area">
+        <router-link to="/" class="logo-link">🛒 MediaShop</router-link>
+      </div>
+
+      <nav class="nav-links">
+        <router-link to="/">Home</router-link>
+        <router-link to="/products">Products</router-link>
+        <router-link to="/register">Register</router-link>
+
+        <!-- Protected Links -->
+        <template v-if="isAuthenticated">
+          <router-link to="/dashboard">Dashboard</router-link>
+          <router-link to="/contracts">Contracts</router-link>
+          <router-link to="/invoices">Invoices</router-link>
+          <router-link to="/profile/edit">Edit Profile</router-link>
+        </template>
+      </nav>
+
+      <div class="auth-area">
+        <template v-if="isAuthenticated">
+          <span class="user-greeting">Hello, {{ username || 'User' }}</span>
+          <button @click="logout" class="btn btn-logout">Logout</button>
+        </template>
+        <template v-else>
+          <button @click="login" class="btn btn-login">Login</button>
+        </template>
+      </div>
+    </div>
   </header>
 
-  <main>
-    <div v-if="isAuthenticated">
-      <pre>{{ token }}</pre>
-    </div>
+  <main class="app-main">
+    <router-view />
   </main>
 </template>
 
-<style scoped>
-header {
-  line-height: 1.5;
-}
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-}
-</style>
