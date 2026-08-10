@@ -15,36 +15,44 @@ export enum ContractStatus {
 }
 
 export enum KnownErrorCode {
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
   CUSTOMER_NOT_FOUND = 'CUSTOMER_NOT_FOUND',
+  CUSTOMER_NOT_ACTIVE = 'CUSTOMER_NOT_ACTIVE',
+  CUSTOMER_VALIDATION_ERROR = 'CUSTOMER_VALIDATION_ERROR',
   PRODUCT_NOT_FOUND = 'PRODUCT_NOT_FOUND',
+  PRODUCT_VALIDATION_ERROR = 'PRODUCT_VALIDATION_ERROR',
   CONTRACT_NOT_FOUND = 'CONTRACT_NOT_FOUND',
-  CONTRACT_NOT_ACTIVE = 'CONTRACT_NOT_ACTIVE',
+  CONTRACT_VALIDATION_ERROR = 'CONTRACT_VALIDATION_ERROR',
   BRAND_MISMATCH = 'BRAND_MISMATCH',
-  DATABASE_ERROR = 'DATABASE_ERROR',
-  UNEXPECTED_ERROR = 'UNEXPECTED_ERROR',
+  INVALID_DISCOUNT = 'INVALID_DISCOUNT',
+  INVOICE_VALIDATION_ERROR = 'INVOICE_VALIDATION_ERROR',
+  REQUEST_VALIDATION_ERROR = 'REQUEST_VALIDATION_ERROR',
+  CONSTRAINT_VIOLATION = 'CONSTRAINT_VIOLATION',
+  MISSING_PARAMETER = 'MISSING_PARAMETER',
+  TYPE_MISMATCH = 'TYPE_MISMATCH',
+  RESOURCE_NOT_FOUND = 'RESOURCE_NOT_FOUND',
+  INTERNAL_ERROR = 'INTERNAL_ERROR',
 }
 
 export interface ApiErrorResponse {
-  code: string
+  correlationId: string
+  errorCode: string
   message: string
   timestamp: string
-  details?: string[]
 }
 
 export class ApiError extends Error {
-  public readonly code: string
+  public readonly correlationId: string
+  public readonly errorCode: string
   public readonly timestamp: string
   public readonly status: number
-  public readonly details?: string[]
 
   constructor(status: number, response: ApiErrorResponse) {
     super(response.message)
     this.name = 'ApiError'
     this.status = status
-    this.code = response.code
+    this.correlationId = response.correlationId
+    this.errorCode = response.errorCode
     this.timestamp = response.timestamp
-    this.details = response.details
 
     // Set the prototype explicitly to restore correct prototype chain
     Object.setPrototypeOf(this, ApiError.prototype)
