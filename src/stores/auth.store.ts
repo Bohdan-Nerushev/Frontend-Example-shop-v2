@@ -96,10 +96,12 @@ export const useAuthStore = defineStore('auth', () => {
     const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'https://localhost:8443'
     const realmName = import.meta.env.VITE_KEYCLOAK_REALM || 'mail-and-media-shop-realm'
     const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'mail-and-media-shop-app'
+    const clientSecret = import.meta.env.VITE_KEYCLOAK_CLIENT_SECRET || '2BcfsFrhh6WWwMQMhxfyjweZuLdWmfpr'
 
     const params = new URLSearchParams()
     params.append('grant_type', 'password')
     params.append('client_id', clientId)
+    params.append('client_secret', clientSecret)
     params.append('username', userVal)
     params.append('password', passwordVal)
 
