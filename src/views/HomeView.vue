@@ -20,14 +20,6 @@ const viewProducts = () => {
     query: { brand: selectedBrand.value },
   })
 }
-
-const goToRegister = () => {
-  router.push({ name: 'register' })
-}
-
-const goToDashboard = () => {
-  router.push({ name: 'dashboard' })
-}
 </script>
 
 <template>
@@ -61,25 +53,6 @@ const goToDashboard = () => {
           </AppButton>
         </div>
       </main>
-
-      <!-- Secondary Actions -->
-      <footer class="hero-footer">
-        <div class="footer-card" @click="goToRegister">
-          <div class="footer-card-icon">📝</div>
-          <div>
-            <h4 class="footer-card-title">New Customer?</h4>
-            <p class="footer-card-desc">Register a new profile and join our ecosystem.</p>
-          </div>
-        </div>
-
-        <div class="footer-card" @click="goToDashboard">
-          <div class="footer-card-icon">🔒</div>
-          <div>
-            <h4 class="footer-card-title">Customer Portal</h4>
-            <p class="footer-card-desc">Access your dashboard, invoices, and active services.</p>
-          </div>
-        </div>
-      </footer>
     </div>
   </div>
 </template>

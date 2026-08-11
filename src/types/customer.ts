@@ -29,6 +29,7 @@ export interface CustomerRequest {
   invoiceAddress: AddressRequest | null
   communicationDetails: CommunicationDetails
   brand: Brand
+  password: string
 }
 
 export interface CustomerResponse {

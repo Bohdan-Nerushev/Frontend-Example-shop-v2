@@ -35,6 +35,9 @@ const createBlankAddress = (): AddressRequest => ({
   country: '',
 })
 
+const confirmPassword = ref('')
+const confirmPasswordError = ref('')
+
 // Setup reactive form state using useForm composable
 const {
   form: customerForm,
@@ -53,6 +56,7 @@ const {
       email: '',
       telephone: '',
     },
+    password: '',
   },
   (values) => {
     const errs: Record<string, any> = {}
@@ -113,6 +117,30 @@ const {
     }
     if (Object.keys(commErrs).length > 0) {
       errs.communicationDetails = commErrs
+    }
+
+    // 5. Password validations
+    let hasPasswordError = false
+    if (!values.password) {
+      errs.password = 'Password is required'
+      hasPasswordError = true
+    } else if (values.password.length < 6) {
+      errs.password = 'Password must be at least 6 characters'
+      hasPasswordError = true
+    }
+
+    if (!confirmPassword.value) {
+      confirmPasswordError.value = 'Please confirm your password'
+      hasPasswordError = true
+    } else if (values.password !== confirmPassword.value) {
+      confirmPasswordError.value = 'Passwords do not match'
+      hasPasswordError = true
+    } else {
+      confirmPasswordError.value = ''
+    }
+
+    if (hasPasswordError && !errs.password) {
+      errs.password = 'Invalid password confirmation'
     }
 
     return errs
@@ -187,12 +215,14 @@ const goToLogin = () => {
                 v-model="customerForm.firstName"
                 :error="formErrors.firstName"
                 label="First Name"
+                autocomplete="given-name"
                 required
               />
               <AppInput
                 v-model="customerForm.lastName"
                 :error="formErrors.lastName"
                 label="Last Name"
+                autocomplete="family-name"
                 required
               />
             </div>
@@ -202,12 +232,36 @@ const goToLogin = () => {
                 :error="formErrors.birthDate"
                 type="date"
                 label="Date of Birth"
+                autocomplete="bday"
                 required
               />
               <AppSelect
                 v-model="customerForm.brand"
                 :options="brandOptions"
                 label="Provider Brand"
+              />
+            </div>
+          </div>
+
+          <!-- Section 1.5: Security / Password -->
+          <div class="form-section">
+            <h3 class="section-title">Password Creation</h3>
+            <div class="form-row">
+              <AppInput
+                v-model="customerForm.password"
+                :error="formErrors.password"
+                type="password"
+                label="Password"
+                autocomplete="new-password"
+                required
+              />
+              <AppInput
+                v-model="confirmPassword"
+                :error="confirmPasswordError"
+                type="password"
+                label="Confirm Password"
+                autocomplete="new-password"
+                required
               />
             </div>
           </div>
@@ -258,12 +312,20 @@ const goToLogin = () => {
             </div>
           </div>
 
-          <div class="form-actions">
+          <div class="form-actions" style="display: flex; gap: 1rem;">
+            <AppButton
+              type="button"
+              variant="secondary"
+              style="flex: 1; padding: 0.75rem;"
+              @click="router.push('/')"
+            >
+              Cancel
+            </AppButton>
             <AppButton
               :loading="isSubmitting"
               type="submit"
               variant="primary"
-              style="width: 100%; padding: 0.75rem;"
+              style="flex: 1; padding: 0.75rem;"
             >
               Submit Registration
             </AppButton>
@@ -278,7 +340,7 @@ const goToLogin = () => {
 <style scoped>
 .registration-container {
   max-width: 720px;
-  margin: 2rem auto;
+  margin: 1rem auto;
   padding: 0 1.5rem;
 }
 
@@ -286,14 +348,14 @@ const goToLogin = () => {
   background-color: var(--color-bg-card, #1e1e1e);
   border: 1px solid var(--color-border, #333);
   border-radius: 1rem;
-  padding: 2.5rem;
+  padding: 2rem;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25);
 }
 
 .form-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 1rem;
+  padding-bottom: 0.5rem;
 }
 
 .form-title {
@@ -312,13 +374,13 @@ const goToLogin = () => {
 .registration-form {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.25rem;
 }
 
 .form-section {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.85rem;
 }
 
 .section-title {

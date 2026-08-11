@@ -9,6 +9,7 @@ withDefaults(
     type?: string
     maxlength?: number | string
     required?: boolean
+    autocomplete?: string
   }>(),
   {
     type: 'text',
@@ -39,6 +40,7 @@ const inputId = computed(() => `input-${crypto.randomUUID()}`)
       :type="type"
       :value="modelValue"
       :maxlength="maxlength"
+      :autocomplete="autocomplete"
       class="app-input"
       @input="onInput"
     />

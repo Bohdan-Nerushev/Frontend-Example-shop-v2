@@ -35,6 +35,7 @@ const updateField = (key: keyof AddressRequest, value: string) => {
           :error="errors?.[ 'street' ]"
           :required="required"
           label="Street"
+          autocomplete="address-line1"
           @update:model-value="updateField('street', $event)"
         />
       </div>
@@ -44,6 +45,7 @@ const updateField = (key: keyof AddressRequest, value: string) => {
           :error="errors?.[ 'number' ]"
           :required="required"
           label="Number"
+          autocomplete="address-line2"
           @update:model-value="updateField('number', $event)"
         />
       </div>
@@ -56,6 +58,7 @@ const updateField = (key: keyof AddressRequest, value: string) => {
           :error="errors?.[ 'postcode' ]"
           :required="required"
           label="Postcode"
+          autocomplete="postal-code"
           @update:model-value="updateField('postcode', $event)"
         />
       </div>
@@ -65,6 +68,7 @@ const updateField = (key: keyof AddressRequest, value: string) => {
           :error="errors?.[ 'city' ]"
           :required="required"
           label="City"
+          autocomplete="address-level2"
           @update:model-value="updateField('city', $event)"
         />
       </div>
@@ -75,6 +79,7 @@ const updateField = (key: keyof AddressRequest, value: string) => {
       :error="errors?.[ 'country' ]"
       :required="required"
       label="Country"
+      autocomplete="country-name"
       @update:model-value="updateField('country', $event)"
     />
   </div>

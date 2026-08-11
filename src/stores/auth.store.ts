@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import keycloak from '../auth/keycloak'
+import axios from 'axios'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(null)
@@ -91,6 +92,44 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
+  const loginWithCredentials = async (userVal: string, passwordVal: string) => {
+    const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'https://localhost:8443'
+    const realmName = import.meta.env.VITE_KEYCLOAK_REALM || 'mail-and-media-shop-realm'
+    const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'mail-and-media-shop-app'
+
+    const params = new URLSearchParams()
+    params.append('grant_type', 'password')
+    params.append('client_id', clientId)
+    params.append('username', userVal)
+    params.append('password', passwordVal)
+
+    try {
+      const response = await axios.post(
+        `${keycloakUrl}/realms/${realmName}/protocol/openid-connect/token`,
+        params,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        }
+      )
+
+      if (response.data && response.data.access_token && response.data.refresh_token) {
+        setToken(response.data.access_token, response.data.refresh_token)
+        // Sync tokens with keycloak instance to keep silent refresh working
+        keycloak.token = response.data.access_token
+        keycloak.refreshToken = response.data.refresh_token
+        keycloak.authenticated = true
+        return true
+      }
+      throw new Error('Invalid token response from Keycloak')
+    } catch (err: any) {
+      console.error('Login credentials request failed', err)
+      const errMsg = err.response?.data?.error_description || err.message || 'Login failed'
+      throw new Error(errMsg)
+    }
+  }
+
   return {
     token,
     refreshToken,
@@ -102,5 +141,6 @@ export const useAuthStore = defineStore('auth', () => {
     initAuth,
     updateToken,
     clearAuth,
+    loginWithCredentials,
   }
 })

@@ -11,8 +11,7 @@ export function setupGuards(router: Router) {
       if (authStore.isAuthenticated) {
         next()
       } else {
-        authStore.login()
-        next(false)
+        next({ name: 'login' })
       }
     } else {
       next()

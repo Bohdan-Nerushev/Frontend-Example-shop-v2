@@ -34,6 +34,7 @@ const updateField = (key: keyof CommunicationDetails, value: string) => {
       :required="required"
       type="email"
       label="Email Address"
+      autocomplete="email"
       @update:model-value="updateField('email', $event)"
     />
 
@@ -43,6 +44,7 @@ const updateField = (key: keyof CommunicationDetails, value: string) => {
       :required="required"
       type="tel"
       label="Telephone"
+      autocomplete="tel"
       @update:model-value="updateField('telephone', $event)"
     />
   </div>

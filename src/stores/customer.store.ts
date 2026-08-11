@@ -13,6 +13,25 @@ export const useCustomerStore = defineStore('customer', () => {
 
   const hasProfile = computed(() => customer.value !== null)
 
+  const logDetailedError = (context: string, err: unknown) => {
+    const axiosError = err as {
+      message?: string
+      response?: {
+        status?: number
+        data?: any
+        headers?: any
+      }
+      request?: any
+    }
+    console.error(`[CustomerStore] Detailed error during ${context}:`, {
+      message: axiosError.message,
+      status: axiosError.response?.status,
+      data: axiosError.response?.data,
+      headers: axiosError.response?.headers,
+      hasRequest: !!axiosError.request,
+    })
+  }
+
   const fetchCustomerProfile = async () => {
     loading.value = true
     error.value = null
@@ -25,6 +44,7 @@ export const useCustomerStore = defineStore('customer', () => {
       if (axiosError.response?.status === 404) {
         customer.value = null
       } else {
+        logDetailedError('fetchCustomerProfile', err)
         const errMsg = axiosError.response?.data?.message || 'Failed to fetch customer profile'
         error.value = errMsg
         notificationStore.error(errMsg)
@@ -41,6 +61,7 @@ export const useCustomerStore = defineStore('customer', () => {
       customer.value = await customerApi.registerCustomer(data)
       notificationStore.success('Profile registered successfully!')
     } catch (err: unknown) {
+      logDetailedError('register', err)
       const axiosError = err as { response?: { data?: { message?: string } } }
       const errMsg = axiosError.response?.data?.message || 'Registration failed'
       error.value = errMsg
@@ -59,6 +80,7 @@ export const useCustomerStore = defineStore('customer', () => {
       customer.value = await customerApi.updateAddress(customer.value.id, data)
       notificationStore.success('Address updated successfully!')
     } catch (err: unknown) {
+      logDetailedError('updateAddress', err)
       const axiosError = err as { response?: { data?: { message?: string } } }
       const errMsg = axiosError.response?.data?.message || 'Failed to update address'
       error.value = errMsg
@@ -77,6 +99,7 @@ export const useCustomerStore = defineStore('customer', () => {
       customer.value = await customerApi.updateInvoiceAddress(customer.value.id, data)
       notificationStore.success('Billing address updated successfully!')
     } catch (err: unknown) {
+      logDetailedError('updateInvoiceAddress', err)
       const axiosError = err as { response?: { data?: { message?: string } } }
       const errMsg = axiosError.response?.data?.message || 'Failed to update billing address'
       error.value = errMsg
@@ -95,6 +118,7 @@ export const useCustomerStore = defineStore('customer', () => {
       customer.value = await customerApi.updateCommunicationDetails(customer.value.id, data)
       notificationStore.success('Contact details updated successfully!')
     } catch (err: unknown) {
+      logDetailedError('updateCommunication', err)
       const axiosError = err as { response?: { data?: { message?: string } } }
       const errMsg = axiosError.response?.data?.message || 'Failed to update contact details'
       error.value = errMsg
@@ -113,6 +137,7 @@ export const useCustomerStore = defineStore('customer', () => {
       customer.value = await customerApi.activateCustomer(customer.value.id)
       notificationStore.success('Profile activated successfully!')
     } catch (err: unknown) {
+      logDetailedError('activate', err)
       const axiosError = err as { response?: { data?: { message?: string } } }
       const errMsg = axiosError.response?.data?.message || 'Failed to activate profile'
       error.value = errMsg
@@ -131,6 +156,7 @@ export const useCustomerStore = defineStore('customer', () => {
       customer.value = await customerApi.deactivateCustomer(customer.value.id)
       notificationStore.success('Profile deactivated successfully!')
     } catch (err: unknown) {
+      logDetailedError('deactivate', err)
       const axiosError = err as { response?: { data?: { message?: string } } }
       const errMsg = axiosError.response?.data?.message || 'Failed to deactivate profile'
       error.value = errMsg
@@ -150,6 +176,7 @@ export const useCustomerStore = defineStore('customer', () => {
       customer.value = null
       notificationStore.success('Profile deleted successfully!')
     } catch (err: unknown) {
+      logDetailedError('deleteProfile', err)
       const axiosError = err as { response?: { data?: { message?: string } } }
       const errMsg = axiosError.response?.data?.message || 'Failed to delete profile'
       error.value = errMsg

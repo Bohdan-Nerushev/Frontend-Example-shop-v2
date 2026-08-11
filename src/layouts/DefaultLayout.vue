@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { useAuth } from '../auth/useAuth'
+import { useRouter } from 'vue-router'
 
-const { login, logout, isAuthenticated, username } = useAuth()
+const { logout, isAuthenticated, username } = useAuth()
+const router = useRouter()
+
+const goToLogin = () => {
+  router.push({ name: 'login' })
+}
 </script>
 
 <template>
@@ -31,7 +37,7 @@ const { login, logout, isAuthenticated, username } = useAuth()
             <button class="btn btn-logout" @click="logout()">Logout</button>
           </template>
           <template v-else>
-            <button class="btn btn-login" @click="login()">Login</button>
+            <button class="btn btn-login" @click="goToLogin()">Login</button>
           </template>
         </div>
       </div>
