@@ -7,6 +7,7 @@ import router from '../router'
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(null)
   const refreshToken = ref<string | null>(null)
+  const tokenExp = ref<number | null>(null)
   const username = ref<string | null>(null)
   const email = ref<string | null>(null)
 
@@ -34,9 +35,12 @@ export const useAuthStore = defineStore('auth', () => {
       const parts = accessToken.split('.')
       const payloadBase64 = parts[1]
       if (payloadBase64) {
-        const decodedPayload = JSON.parse(atob(payloadBase64))
+        // Decode base64 URL safe string
+        const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
+        const decodedPayload = JSON.parse(atob(base64))
         username.value = decodedPayload.preferred_username || null
         email.value = decodedPayload.email || null
+        tokenExp.value = decodedPayload.exp || null
       }
     } catch (e) {
       console.error('Failed to parse access token payload', e)
@@ -48,6 +52,7 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken.value = null
     username.value = null
     email.value = null
+    tokenExp.value = null
   }
 
   const initAuth = (): Promise<boolean> => {
@@ -83,20 +88,59 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const updateToken = (minValiditySeconds: number = 30): Promise<boolean> => {
-    return new Promise((resolve, reject) => {
-      keycloak
-        .updateToken(minValiditySeconds)
-        .then((refreshed) => {
-          if (refreshed && keycloak.token && keycloak.refreshToken) {
-            setToken(keycloak.token, keycloak.refreshToken)
+    return new Promise(async (resolve, reject) => {
+      // 1. Check if token is still valid
+      if (token.value && tokenExp.value) {
+        const now = Math.floor(Date.now() / 1000)
+        const timeRemaining = tokenExp.value - now
+        if (timeRemaining > minValiditySeconds) {
+          return resolve(false) // Token is still valid, no refresh needed
+        }
+      }
+
+      // 2. If token is expired or close to expiring, check refresh token
+      if (!refreshToken.value) {
+        clearAuth()
+        return reject(new Error('No refresh token available'))
+      }
+
+      // 3. Perform manual refresh via Axios
+      const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'https://localhost:8443'
+      const realmName = import.meta.env.VITE_KEYCLOAK_REALM || 'mail-and-media-shop-realm'
+      const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'mail-and-media-shop-app'
+      const clientSecret = import.meta.env.VITE_KEYCLOAK_CLIENT_SECRET || '2BcfsFrhh6WWwMQMhxfyjweZuLdWmfpr'
+
+      const params = new URLSearchParams()
+      params.append('grant_type', 'refresh_token')
+      params.append('client_id', clientId)
+      params.append('client_secret', clientSecret)
+      params.append('refresh_token', refreshToken.value)
+
+      try {
+        const response = await axios.post(
+          `${keycloakUrl}/realms/${realmName}/protocol/openid-connect/token`,
+          params,
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
           }
-          resolve(refreshed)
-        })
-        .catch((error) => {
-          console.error('Failed to refresh token', error)
-          clearAuth()
-          reject(error)
-        })
+        )
+
+        if (response.data && response.data.access_token && response.data.refresh_token) {
+          setToken(response.data.access_token, response.data.refresh_token)
+          // Sync with Keycloak JS instance just in case
+          keycloak.token = response.data.access_token
+          keycloak.refreshToken = response.data.refresh_token
+          keycloak.authenticated = true
+          return resolve(true)
+        }
+        throw new Error('Invalid token response from Keycloak during refresh')
+      } catch (err: any) {
+        console.error('Failed to refresh token', err)
+        clearAuth()
+        reject(err)
+      }
     })
   }
 
