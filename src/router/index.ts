@@ -36,18 +36,6 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
-    path: '/contracts',
-    name: 'contracts',
-    component: () => import('../views/ContractsView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/invoices',
-    name: 'invoices',
-    component: () => import('../views/InvoiceView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('../views/NotFoundView.vue'),

@@ -5,11 +5,33 @@ import axios from 'axios'
 import router from '../router'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(null)
-  const refreshToken = ref<string | null>(null)
+  const token = ref<string | null>(localStorage.getItem('access_token'))
+  const refreshToken = ref<string | null>(localStorage.getItem('refresh_token'))
   const tokenExp = ref<number | null>(null)
   const username = ref<string | null>(null)
   const email = ref<string | null>(null)
+
+  const parseTokenPayload = (accessToken: string) => {
+    try {
+      const parts = accessToken.split('.')
+      const payloadBase64 = parts[1]
+      if (payloadBase64) {
+        // Decode base64 URL safe string
+        const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
+        const decodedPayload = JSON.parse(atob(base64))
+        username.value = decodedPayload.preferred_username || null
+        email.value = decodedPayload.email || null
+        tokenExp.value = decodedPayload.exp || null
+      }
+    } catch (e) {
+      console.error('Failed to parse access token payload', e)
+    }
+  }
+
+  // Restore payload on store creation if token exists
+  if (token.value) {
+    parseTokenPayload(token.value)
+  }
 
   const isAuthenticated = computed(() => !!token.value)
 
@@ -30,21 +52,9 @@ export const useAuthStore = defineStore('auth', () => {
   const setToken = (accessToken: string, refToken: string) => {
     token.value = accessToken
     refreshToken.value = refToken
-
-    try {
-      const parts = accessToken.split('.')
-      const payloadBase64 = parts[1]
-      if (payloadBase64) {
-        // Decode base64 URL safe string
-        const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
-        const decodedPayload = JSON.parse(atob(base64))
-        username.value = decodedPayload.preferred_username || null
-        email.value = decodedPayload.email || null
-        tokenExp.value = decodedPayload.exp || null
-      }
-    } catch (e) {
-      console.error('Failed to parse access token payload', e)
-    }
+    localStorage.setItem('access_token', accessToken)
+    localStorage.setItem('refresh_token', refToken)
+    parseTokenPayload(accessToken)
   }
 
   const clearAuth = () => {
@@ -53,6 +63,8 @@ export const useAuthStore = defineStore('auth', () => {
     username.value = null
     email.value = null
     tokenExp.value = null
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
   }
 
   const initAuth = (): Promise<boolean> => {

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useCustomerStore } from '../stores/customer.store'
 import { useAuthStore } from '../stores/auth.store'
 import { useContractStore } from '../stores/contract.store'
+import { useNotificationStore } from '../stores/notification.store'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useNotification } from '../composables/useNotification'
 import { formatDate, formatCurrency } from '../utils/formatters'
@@ -73,6 +74,7 @@ const contactForm = reactive<CommunicationDetails>({
 const addressErrors = ref<Partial<Record<keyof AddressRequest, string>>>({})
 const invoiceAddressErrors = ref<Partial<Record<keyof AddressRequest, string>>>({})
 const contactErrors = ref<Partial<Record<keyof CommunicationDetails, string>>>({})
+const useSameInvoiceAddress = ref(true)
 
 const populateForms = () => {
   const c = customerStore.customer
@@ -85,13 +87,24 @@ const populateForms = () => {
   addressForm.city     = c.address?.city     ?? ''
   addressForm.country  = c.address?.country  ?? ''
 
+  // Determine if Billing Address is identical to Main Address
+  const inv = c.invoiceAddress
+  const hasInvoice = inv && (
+    (inv.street ?? '').trim() !== (c.address?.street ?? '').trim() ||
+    (inv.number ?? '').trim() !== (c.address?.number ?? '').trim() ||
+    (inv.postcode ?? '').trim() !== (c.address?.postcode ?? '').trim() ||
+    (inv.city ?? '').trim() !== (c.address?.city ?? '').trim() ||
+    (inv.country ?? '').trim() !== (c.address?.country ?? '').trim()
+  )
+  useSameInvoiceAddress.value = !hasInvoice
+
   // Invoice address (fallback to main if null)
-  const inv = c.invoiceAddress ?? c.address
-  invoiceAddressForm.street   = inv?.street   ?? ''
-  invoiceAddressForm.number   = inv?.number   ?? ''
-  invoiceAddressForm.postcode = inv?.postcode ?? ''
-  invoiceAddressForm.city     = inv?.city     ?? ''
-  invoiceAddressForm.country  = inv?.country  ?? ''
+  const invToShow = inv ?? c.address
+  invoiceAddressForm.street   = invToShow?.street   ?? ''
+  invoiceAddressForm.number   = invToShow?.number   ?? ''
+  invoiceAddressForm.postcode = invToShow?.postcode ?? ''
+  invoiceAddressForm.city     = invToShow?.city     ?? ''
+  invoiceAddressForm.country  = invToShow?.country  ?? ''
 
   // Contact
   contactForm.email     = c.communicationDetails?.email     ?? ''
@@ -146,6 +159,25 @@ const isContactChanged = computed(() => {
     contactForm.telephone.trim() !== (c.communicationDetails.telephone ?? '').trim()
   )
 })
+
+const copiedField = ref<string | null>(null)
+const notificationStore = useNotificationStore()
+
+const copyText = async (text: string | null | undefined, fieldId: string, fieldLabel: string) => {
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(String(text).trim())
+    copiedField.value = fieldId
+    notificationStore.success(`Field "${fieldLabel}" copied successfully!`)
+    setTimeout(() => {
+      if (copiedField.value === fieldId) {
+        copiedField.value = null
+      }
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy text: ', err)
+  }
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const validateAddress = (form: AddressRequest) => {
@@ -207,6 +239,26 @@ const validateContact = (form: CommunicationDetails) => {
 }
 
 // ── Address handlers ───────────────────────────────────────────────────────────
+const handleInvoiceAddressToggle = async () => {
+  if (useSameInvoiceAddress.value) {
+    invoiceAddressForm.street = addressForm.street
+    invoiceAddressForm.number = addressForm.number
+    invoiceAddressForm.postcode = addressForm.postcode
+    invoiceAddressForm.city = addressForm.city
+    invoiceAddressForm.country = addressForm.country
+
+    invoiceAddressSaving.value = true
+    try {
+      await customerStore.updateInvoiceAddress({ ...addressForm })
+      notification.success('Billing Address synchronized with Main Address successfully!')
+    } catch (e) {
+      console.error('Failed to sync invoice address', e)
+    } finally {
+      invoiceAddressSaving.value = false
+    }
+  }
+}
+
 const handleSaveAddress = () => {
   addressErrors.value = validateAddress(addressForm)
   if (Object.keys(addressErrors.value).length > 0) return
@@ -244,6 +296,9 @@ const handleSaveAddress = () => {
       addressSaving.value = true
       try {
         await customerStore.updateAddress({ ...addressForm })
+        if (useSameInvoiceAddress.value) {
+          await customerStore.updateInvoiceAddress({ ...addressForm })
+        }
       } catch {
         // handled in store
       } finally {
@@ -503,26 +558,110 @@ const goToRegister = () => router.push({ name: 'register' })
             <div class="info-item">
               <span class="info-label">First Name</span>
               <span class="info-value">{{ customerStore.customer.firstName }}</span>
+              <button
+                type="button"
+                class="info-copy-btn"
+                :class="{ 'copied': copiedField === 'firstName' }"
+                @click="copyText(customerStore.customer.firstName, 'firstName', 'First Name')"
+                :title="copiedField === 'firstName' ? 'Copied!' : 'Copy First Name'"
+              >
+                <svg v-if="copiedField === 'firstName'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376A8.965 8.965 0 0 0 12 12.75c-.197 0-.39.024-.577.07m.577 4.43a8.98 8.98 0 0 0 3-1.832m0 0a8.967 8.967 0 0 1-3.375-3.375m3.375 3.375V10.5m-3.375 3.375H9" />
+                </svg>
+              </button>
             </div>
             <div class="info-item">
               <span class="info-label">Last Name</span>
               <span class="info-value">{{ customerStore.customer.lastName }}</span>
+              <button
+                type="button"
+                class="info-copy-btn"
+                :class="{ 'copied': copiedField === 'lastName' }"
+                @click="copyText(customerStore.customer.lastName, 'lastName', 'Last Name')"
+                :title="copiedField === 'lastName' ? 'Copied!' : 'Copy Last Name'"
+              >
+                <svg v-if="copiedField === 'lastName'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376A8.965 8.965 0 0 0 12 12.75c-.197 0-.39.024-.577.07m.577 4.43a8.98 8.98 0 0 0 3-1.832m0 0a8.967 8.967 0 0 1-3.375-3.375m3.375 3.375V10.5m-3.375 3.375H9" />
+                </svg>
+              </button>
             </div>
             <div class="info-item">
               <span class="info-label">Date of Birth</span>
               <span class="info-value">{{ formatDate(customerStore.customer.birthDate) }}</span>
+              <button
+                type="button"
+                class="info-copy-btn"
+                :class="{ 'copied': copiedField === 'birthDate' }"
+                @click="copyText(formatDate(customerStore.customer.birthDate), 'birthDate', 'Date of Birth')"
+                :title="copiedField === 'birthDate' ? 'Copied!' : 'Copy Date of Birth'"
+              >
+                <svg v-if="copiedField === 'birthDate'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376A8.965 8.965 0 0 0 12 12.75c-.197 0-.39.024-.577.07m.577 4.43a8.98 8.98 0 0 0 3-1.832m0 0a8.967 8.967 0 0 1-3.375-3.375m3.375 3.375V10.5m-3.375 3.375H9" />
+                </svg>
+              </button>
             </div>
             <div class="info-item">
               <span class="info-label">Brand</span>
               <span class="info-value">{{ customerStore.customer.brand }}</span>
+              <button
+                type="button"
+                class="info-copy-btn"
+                :class="{ 'copied': copiedField === 'brand' }"
+                @click="copyText(customerStore.customer.brand, 'brand', 'Brand')"
+                :title="copiedField === 'brand' ? 'Copied!' : 'Copy Brand'"
+              >
+                <svg v-if="copiedField === 'brand'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376A8.965 8.965 0 0 0 12 12.75c-.197 0-.39.024-.577.07m.577 4.43a8.98 8.98 0 0 0 3-1.832m0 0a8.967 8.967 0 0 1-3.375-3.375m3.375 3.375V10.5m-3.375 3.375H9" />
+                </svg>
+              </button>
             </div>
             <div class="info-item">
               <span class="info-label">Status</span>
               <CustomerStatusBadge :status="customerStore.customer.status" />
+              <button
+                type="button"
+                class="info-copy-btn"
+                :class="{ 'copied': copiedField === 'status' }"
+                @click="copyText(customerStore.customer.status, 'status', 'Status')"
+                :title="copiedField === 'status' ? 'Copied!' : 'Copy Status'"
+              >
+                <svg v-if="copiedField === 'status'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376A8.965 8.965 0 0 0 12 12.75c-.197 0-.39.024-.577.07m.577 4.43a8.98 8.98 0 0 0 3-1.832m0 0a8.967 8.967 0 0 1-3.375-3.375m3.375 3.375V10.5m-3.375 3.375H9" />
+                </svg>
+              </button>
             </div>
             <div class="info-item">
               <span class="info-label">Customer ID</span>
               <span class="info-value info-value--mono">{{ customerStore.customer.id }}</span>
+              <button
+                type="button"
+                class="info-copy-btn"
+                :class="{ 'copied': copiedField === 'id' }"
+                @click="copyText(customerStore.customer.id, 'id', 'Customer ID')"
+                :title="copiedField === 'id' ? 'Copied!' : 'Copy Customer ID'"
+              >
+                <svg v-if="copiedField === 'id'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="info-copy-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376A8.965 8.965 0 0 0 12 12.75c-.197 0-.39.024-.577.07m.577 4.43a8.98 8.98 0 0 0 3-1.832m0 0a8.967 8.967 0 0 1-3.375-3.375m3.375 3.375V10.5m-3.375 3.375H9" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -540,6 +679,7 @@ const goToRegister = () => router.push({ name: 'register' })
               :error="contactErrors.email"
               placeholder="your.email@gmx.de"
               class="full-width"
+              copyable
             />
             <AppInput
               v-model="contactForm.telephone"
@@ -548,6 +688,7 @@ const goToRegister = () => router.push({ name: 'register' })
               :error="contactErrors.telephone"
               placeholder="+4915123456789"
               class="full-width"
+              copyable
             />
           </div>
           <AppButton variant="primary" :loading="contactSaving" :disabled="!isContactChanged" @click="handleSaveContact" style="margin-bottom: 0.5rem;">
@@ -563,11 +704,11 @@ const goToRegister = () => router.push({ name: 'register' })
           <div class="address-block" style="margin-bottom: 2rem;">
             <h2 class="section-title">Main Address</h2>
             <div class="form-grid" style="margin-bottom: 1.25rem;">
-              <AppInput v-model="addressForm.street"   label="Street"   :error="addressErrors.street"   placeholder="Main Street" />
-              <AppInput v-model="addressForm.number"   label="Number"   :error="addressErrors.number"   placeholder="12a" />
-              <AppInput v-model="addressForm.postcode" label="Postcode" :error="addressErrors.postcode" placeholder="10115" />
-              <AppInput v-model="addressForm.city"     label="City"     :error="addressErrors.city"     placeholder="Berlin" />
-              <AppInput v-model="addressForm.country"  label="Country"  :error="addressErrors.country"  placeholder="Germany" class="full-width" />
+              <AppInput v-model="addressForm.street"   label="Street"   :error="addressErrors.street"   placeholder="Main Street" copyable />
+              <AppInput v-model="addressForm.number"   label="Number"   :error="addressErrors.number"   placeholder="12a" copyable />
+              <AppInput v-model="addressForm.postcode" label="Postcode" :error="addressErrors.postcode" placeholder="10115" copyable />
+              <AppInput v-model="addressForm.city"     label="City"     :error="addressErrors.city"     placeholder="Berlin" copyable />
+              <AppInput v-model="addressForm.country"  label="Country"  :error="addressErrors.country"  placeholder="Germany" class="full-width" copyable />
             </div>
             <AppButton variant="primary" :loading="addressSaving" :disabled="!isAddressChanged" @click="handleSaveAddress">
               Save Main Address
@@ -579,16 +720,32 @@ const goToRegister = () => router.push({ name: 'register' })
           <!-- Billing / Invoice Address -->
           <div class="address-block">
             <h2 class="section-title">Billing Address</h2>
-            <div class="form-grid" style="margin-bottom: 1.25rem;">
-              <AppInput v-model="invoiceAddressForm.street"   label="Street"   :error="invoiceAddressErrors.street"   placeholder="Main Street" />
-              <AppInput v-model="invoiceAddressForm.number"   label="Number"   :error="invoiceAddressErrors.number"   placeholder="12a" />
-              <AppInput v-model="invoiceAddressForm.postcode" label="Postcode" :error="invoiceAddressErrors.postcode" placeholder="10115" />
-              <AppInput v-model="invoiceAddressForm.city"     label="City"     :error="invoiceAddressErrors.city"     placeholder="Berlin" />
-              <AppInput v-model="invoiceAddressForm.country"  label="Country"  :error="invoiceAddressErrors.country"  placeholder="Germany" class="full-width" />
+            
+            <div class="checkbox-row" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+              <input
+                id="dashboard-same-address-checkbox"
+                type="checkbox"
+                v-model="useSameInvoiceAddress"
+                @change="handleInvoiceAddressToggle"
+                class="app-checkbox"
+              />
+              <label for="dashboard-same-address-checkbox" class="checkbox-label" style="font-size: 0.9rem; color: var(--color-text-main); cursor: pointer; user-select: none;">
+                Billing Address такаж як Main Address
+              </label>
             </div>
-            <AppButton variant="primary" :loading="invoiceAddressSaving" :disabled="!isInvoiceAddressChanged" @click="handleSaveInvoiceAddress">
-              Save Billing Address
-            </AppButton>
+
+            <div v-if="!useSameInvoiceAddress">
+              <div class="form-grid" style="margin-bottom: 1.25rem;">
+                <AppInput v-model="invoiceAddressForm.street"   label="Street"   :error="invoiceAddressErrors.street"   placeholder="Main Street" copyable />
+                <AppInput v-model="invoiceAddressForm.number"   label="Number"   :error="invoiceAddressErrors.number"   placeholder="12a" copyable />
+                <AppInput v-model="invoiceAddressForm.postcode" label="Postcode" :error="invoiceAddressErrors.postcode" placeholder="10115" copyable />
+                <AppInput v-model="invoiceAddressForm.city"     label="City"     :error="invoiceAddressErrors.city"     placeholder="Berlin" copyable />
+                <AppInput v-model="invoiceAddressForm.country"  label="Country"  :error="invoiceAddressErrors.country"  placeholder="Germany" class="full-width" copyable />
+              </div>
+              <AppButton variant="primary" :loading="invoiceAddressSaving" :disabled="!isInvoiceAddressChanged" @click="handleSaveInvoiceAddress">
+                Save Billing Address
+              </AppButton>
+            </div>
           </div>
         </div>
 
@@ -1035,13 +1192,50 @@ const goToRegister = () => router.push({ name: 'register' })
 }
 
 .info-item {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
   background: rgba(255,255,255,0.02);
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 0.5rem;
-  padding: 0.875rem 1rem;
+  padding: 0.875rem 2.5rem 0.875rem 1rem;
+}
+
+.info-copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, transform 0.1s;
+  user-select: none;
+  outline: none;
+}
+
+.info-copy-btn:hover {
+  color: var(--color-text-main);
+  transform: scale(1.15);
+}
+
+.info-copy-btn:active {
+  transform: scale(0.95);
+}
+
+.info-copy-btn.copied {
+  color: var(--color-success);
+}
+
+.info-copy-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
 }
 
 .info-label {

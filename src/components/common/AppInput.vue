@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useNotificationStore } from '../../stores/notification.store'
 
 const props = withDefaults(
   defineProps<{
@@ -10,11 +11,13 @@ const props = withDefaults(
     maxlength?: number | string
     required?: boolean
     autocomplete?: string
+    copyable?: boolean
   }>(),
   {
     type: 'text',
     error: null,
     required: false,
+    copyable: false,
   }
 )
 
@@ -30,6 +33,8 @@ const onInput = (event: Event) => {
 const inputId = computed(() => `input-${crypto.randomUUID()}`)
 
 const showPassword = ref(false)
+const copied = ref(false)
+const notificationStore = useNotificationStore()
 
 const computedType = computed(() => {
   if (props.type === 'password') {
@@ -40,6 +45,21 @@ const computedType = computed(() => {
 
 const togglePasswordVisibility = () => {
   showPassword.value = !showPassword.value
+}
+
+const copyToClipboard = async () => {
+  if (!props.modelValue) return
+  try {
+    await navigator.clipboard.writeText(String(props.modelValue).trim())
+    copied.value = true
+    const fieldName = props.label ? `"${props.label}"` : 'Value'
+    notificationStore.success(`Field ${fieldName} copied successfully!`)
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy text: ', err)
+  }
 }
 </script>
 
@@ -56,7 +76,7 @@ const togglePasswordVisibility = () => {
         :maxlength="maxlength"
         :autocomplete="autocomplete"
         class="app-input"
-        :class="{ 'pr-10': type === 'password' }"
+        :class="{ 'pr-10': type === 'password' || copyable }"
         @input="onInput"
       />
       <button
@@ -72,6 +92,22 @@ const togglePasswordVisibility = () => {
         <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" class="eye-icon">
           <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
           <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        </svg>
+      </button>
+      <button
+        v-else-if="copyable"
+        type="button"
+        class="copy-btn"
+        @click="copyToClipboard"
+        :class="{ 'copied': copied }"
+        aria-label="Copy input value"
+        :title="copied ? 'Copied!' : 'Copy to clipboard'"
+      >
+        <svg v-if="copied" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="copy-success-icon">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+        </svg>
+        <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="copy-icon">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376A8.965 8.965 0 0 0 12 12.75c-.197 0-.39.024-.577.07m.577 4.43a8.98 8.98 0 0 0 3-1.832m0 0a8.967 8.967 0 0 1-3.375-3.375m3.375 3.375V10.5m-3.375 3.375H9" />
         </svg>
       </button>
     </div>
@@ -161,6 +197,44 @@ const togglePasswordVisibility = () => {
 }
 
 .app-input.pr-10 {
-  padding-right: 2.5rem;
+  padding-right: 2.75rem;
+}
+
+.copy-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, transform 0.1s;
+  user-select: none;
+  outline: none;
+}
+
+.copy-btn:hover {
+  color: var(--color-text-main);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.copy-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.copy-btn.copied {
+  color: var(--color-success);
+}
+
+.copy-icon,
+.copy-success-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  stroke: currentColor;
 }
 </style>
