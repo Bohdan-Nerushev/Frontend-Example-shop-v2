@@ -35,10 +35,24 @@ http.interceptors.request.use(
   }
 )
 
-// Response Interceptor: handle 401 Unauthorized errors
+// Response Interceptor: handle 401 Unauthorized errors and log detailed errors
 http.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Log detailed error information for diagnostics
+    const requestUrl = error.config?.url || 'unknown'
+    const requestMethod = error.config?.method?.toUpperCase() || 'unknown'
+    const responseStatus = error.response?.status
+    const errorData = error.response?.data
+
+    console.error(`[API Error] ${requestMethod} ${requestUrl} failed with status ${responseStatus || 'network error'}`, {
+      correlationId: errorData?.correlationId,
+      errorCode: errorData?.errorCode,
+      message: errorData?.message || error.message,
+      timestamp: errorData?.timestamp,
+      fullError: error
+    })
+
     if (error.response && error.response.status === 401) {
       const authStore = useAuthStore()
       authStore.logout()

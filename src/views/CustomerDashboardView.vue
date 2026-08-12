@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive } from 'vue'
+import { onMounted, ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCustomerStore } from '../stores/customer.store'
 import { useAuthStore } from '../stores/auth.store'
@@ -18,7 +18,7 @@ import type { AddressRequest, CommunicationDetails } from '../types/customer'
 import type { InvoiceResponse } from '../types/invoice'
 import { billingApi } from '../api/billingApi'
 
-type TabId = 'profile' | 'contracts' | 'addresses' | 'contacts' | 'invoice' | 'danger'
+type TabId = 'profile' | 'billing'
 
 const router = useRouter()
 const customerStore = useCustomerStore()
@@ -31,13 +31,23 @@ const notification = useNotification()
 const activeTab = ref<TabId>('profile')
 
 const tabs: { id: TabId; label: string; icon: string }[] = [
-  { id: 'profile',   label: 'Profile',   icon: '👤' },
-  { id: 'contracts', label: 'Contracts', icon: '📄' },
-  { id: 'addresses', label: 'Addresses', icon: '🏠' },
-  { id: 'contacts',  label: 'Contacts',  icon: '📞' },
-  { id: 'invoice',   label: 'Invoice',   icon: '💶' },
-  { id: 'danger',    label: 'Security',  icon: '⚠️' },
+  { id: 'profile',   label: 'Profile',             icon: '👤' },
+  { id: 'billing',   label: 'Contracts & Billing', icon: '📄' },
 ]
+
+// ── Save confirmation modal state ─────────────────────────────────────────────
+const isSaveConfirmModalOpen = ref(false)
+const saveConfirmData = ref<{
+  title: string
+  changes: { field: string; oldVal: string; newVal: string }[]
+  onConfirm: () => Promise<void> | void
+} | null>(null)
+
+const executeSaveWithConfirmation = async () => {
+  if (!saveConfirmData.value) return
+  isSaveConfirmModalOpen.value = false
+  await saveConfirmData.value.onConfirm()
+}
 
 // ── Loading flags ──────────────────────────────────────────────────────────────
 const activeContractLoadingId = ref<string | null>(null)
@@ -115,47 +125,139 @@ const validateContact = (form: CommunicationDetails) => {
 }
 
 // ── Address handlers ───────────────────────────────────────────────────────────
-const handleSaveAddress = async () => {
+const handleSaveAddress = () => {
   addressErrors.value = validateAddress(addressForm)
   if (Object.keys(addressErrors.value).length > 0) return
 
-  addressSaving.value = true
-  try {
-    await customerStore.updateAddress({ ...addressForm })
-  } catch {
-    // Error is shown via notification store in customerStore
-  } finally {
-    addressSaving.value = false
+  const c = customerStore.customer
+  if (!c) return
+
+  const oldAddr = c.address || {}
+  const changes: { field: string; oldVal: string; newVal: string }[] = []
+  const fields: { key: keyof AddressRequest; label: string }[] = [
+    { key: 'street', label: 'Street' },
+    { key: 'number', label: 'Number' },
+    { key: 'postcode', label: 'Postcode' },
+    { key: 'city', label: 'City' },
+    { key: 'country', label: 'Country' }
+  ]
+
+  fields.forEach(({ key, label }) => {
+    const oldVal = oldAddr[key] ?? ''
+    const newVal = addressForm[key] ?? ''
+    if (oldVal !== newVal) {
+      changes.push({ field: `Main Address -> ${label}`, oldVal, newVal })
+    }
+  })
+
+  if (changes.length === 0) {
+    notification.info('No changes detected.')
+    return
   }
+
+  saveConfirmData.value = {
+    title: 'Confirm Main Address Changes',
+    changes,
+    onConfirm: async () => {
+      addressSaving.value = true
+      try {
+        await customerStore.updateAddress({ ...addressForm })
+      } catch {
+        // handled in store
+      } finally {
+        addressSaving.value = false
+      }
+    }
+  }
+  isSaveConfirmModalOpen.value = true
 }
 
-const handleSaveInvoiceAddress = async () => {
+const handleSaveInvoiceAddress = () => {
   invoiceAddressErrors.value = validateAddress(invoiceAddressForm)
   if (Object.keys(invoiceAddressErrors.value).length > 0) return
 
-  invoiceAddressSaving.value = true
-  try {
-    await customerStore.updateInvoiceAddress({ ...invoiceAddressForm })
-  } catch {
-    // Error is shown via notification store
-  } finally {
-    invoiceAddressSaving.value = false
+  const c = customerStore.customer
+  if (!c) return
+
+  const oldAddr = c.invoiceAddress || c.address || {}
+  const changes: { field: string; oldVal: string; newVal: string }[] = []
+  const fields: { key: keyof AddressRequest; label: string }[] = [
+    { key: 'street', label: 'Street' },
+    { key: 'number', label: 'Number' },
+    { key: 'postcode', label: 'Postcode' },
+    { key: 'city', label: 'City' },
+    { key: 'country', label: 'Country' }
+  ]
+
+  fields.forEach(({ key, label }) => {
+    const oldVal = oldAddr[key] ?? ''
+    const newVal = invoiceAddressForm[key] ?? ''
+    if (oldVal !== newVal) {
+      changes.push({ field: `Billing Address -> ${label}`, oldVal, newVal })
+    }
+  })
+
+  if (changes.length === 0) {
+    notification.info('No changes detected.')
+    return
   }
+
+  saveConfirmData.value = {
+    title: 'Confirm Billing Address Changes',
+    changes,
+    onConfirm: async () => {
+      invoiceAddressSaving.value = true
+      try {
+        await customerStore.updateInvoiceAddress({ ...invoiceAddressForm })
+      } catch {
+        // handled in store
+      } finally {
+        invoiceAddressSaving.value = false
+      }
+    }
+  }
+  isSaveConfirmModalOpen.value = true
 }
 
 // ── Contact handler ────────────────────────────────────────────────────────────
-const handleSaveContact = async () => {
+const handleSaveContact = () => {
   contactErrors.value = validateContact(contactForm)
   if (Object.keys(contactErrors.value).length > 0) return
 
-  contactSaving.value = true
-  try {
-    await customerStore.updateCommunication({ ...contactForm })
-  } catch {
-    // Error is shown via notification store
-  } finally {
-    contactSaving.value = false
+  const c = customerStore.customer
+  if (!c) return
+
+  const oldEmail = c.communicationDetails?.email ?? ''
+  const oldPhone = c.communicationDetails?.telephone ?? ''
+
+  const changes: { field: string; oldVal: string; newVal: string }[] = []
+  if (oldEmail !== contactForm.email) {
+    changes.push({ field: 'Email Address', oldVal: oldEmail, newVal: contactForm.email })
   }
+  if (oldPhone !== contactForm.telephone) {
+    changes.push({ field: 'Telephone', oldVal: oldPhone, newVal: contactForm.telephone })
+  }
+
+  if (changes.length === 0) {
+    notification.info('No changes detected.')
+    return
+  }
+
+  saveConfirmData.value = {
+    title: 'Confirm Contact Details Changes',
+    changes,
+    onConfirm: async () => {
+      contactSaving.value = true
+      try {
+        await customerStore.updateCommunication({ ...contactForm })
+      } catch {
+        // handled in store
+      } finally {
+        contactSaving.value = false
+      }
+    }
+  }
+  isSaveConfirmModalOpen.value = true
 }
 
 // ── Contract handlers ──────────────────────────────────────────────────────────
@@ -188,6 +290,9 @@ const handleGenerateInvoice = async () => {
 }
 
 // ── Profile activation / deactivation / delete ────────────────────────────────
+const deleteConfirmText = ref('')
+const isProfileActive = computed(() => customerStore.customer?.status === 'ACTIVE')
+
 const handleActivateProfile = async () => {
   try {
     await customerStore.activate()
@@ -196,36 +301,46 @@ const handleActivateProfile = async () => {
   }
 }
 
-const handleDeactivateProfile = async () => {
-  const confirmed = await confirmDialog.confirm({
-    title: 'Deactivate Profile',
-    message: 'Are you sure you want to deactivate your profile? You cannot purchase new subscriptions while deactivated.',
-    confirmText: 'Deactivate',
-    cancelText: 'Keep Active',
-  })
-  if (confirmed) {
-    try {
-      await customerStore.deactivate()
-    } catch {
-      // handled in store
+const handleToggleProfileStatus = async (event: Event) => {
+  const checkbox = event.target as HTMLInputElement
+  const shouldBeActive = checkbox.checked
+
+  if (shouldBeActive) {
+    await handleActivateProfile()
+  } else {
+    const confirmed = await confirmDialog.confirm({
+      title: 'Deactivate Profile',
+      message: 'Are you sure you want to deactivate your profile? You cannot purchase new subscriptions while deactivated.',
+      confirmText: 'Deactivate',
+      cancelText: 'Keep Active',
+    })
+    if (confirmed) {
+      try {
+        await customerStore.deactivate()
+      } catch {
+        checkbox.checked = true
+      }
+    } else {
+      checkbox.checked = true
     }
   }
 }
 
-const handleDeleteProfile = async () => {
-  const confirmed = await confirmDialog.confirm({
-    title: 'Delete Account Permanently',
-    message: 'WARNING: This permanently deletes your customer profile and all related data. This cannot be undone.',
-    confirmText: 'Delete Permanently',
-    cancelText: 'Cancel',
-  })
-  if (confirmed) {
-    try {
-      await customerStore.deleteProfile()
-      authStore.logout()
-    } catch {
-      // handled in store
-    }
+const isDeleteModalOpen = ref(false)
+
+const handleDeleteProfile = () => {
+  deleteConfirmText.value = ''
+  isDeleteModalOpen.value = true
+}
+
+const executeDeleteProfile = async () => {
+  if (deleteConfirmText.value !== 'delete') return
+  try {
+    await customerStore.deleteProfile()
+    isDeleteModalOpen.value = false
+    authStore.logout()
+  } catch {
+    // handled in store
   }
 }
 
@@ -299,272 +414,275 @@ const goToRegister = () => router.push({ name: 'register' })
 
       <!-- ── Tab: Profile ─────────────────────────────────────────────────── -->
       <section v-if="activeTab === 'profile'" class="tab-content">
-        <h2 class="section-title">Personal Information</h2>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-label">First Name</span>
-            <span class="info-value">{{ customerStore.customer.firstName }}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Last Name</span>
-            <span class="info-value">{{ customerStore.customer.lastName }}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Date of Birth</span>
-            <span class="info-value">{{ formatDate(customerStore.customer.birthDate) }}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Brand</span>
-            <span class="info-value">{{ customerStore.customer.brand }}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Status</span>
-            <CustomerStatusBadge :status="customerStore.customer.status" />
-          </div>
-          <div class="info-item">
-            <span class="info-label">Customer ID</span>
-            <span class="info-value info-value--mono">{{ customerStore.customer.id }}</span>
+        <!-- Personal Information -->
+        <div class="profile-section">
+          <h2 class="section-title">Personal Information</h2>
+          <div class="info-grid" style="margin-bottom: 1.5rem;">
+            <div class="info-item">
+              <span class="info-label">First Name</span>
+              <span class="info-value">{{ customerStore.customer.firstName }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Last Name</span>
+              <span class="info-value">{{ customerStore.customer.lastName }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Date of Birth</span>
+              <span class="info-value">{{ formatDate(customerStore.customer.birthDate) }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Brand</span>
+              <span class="info-value">{{ customerStore.customer.brand }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Status</span>
+              <CustomerStatusBadge :status="customerStore.customer.status" />
+            </div>
+            <div class="info-item">
+              <span class="info-label">Customer ID</span>
+              <span class="info-value info-value--mono">{{ customerStore.customer.id }}</span>
+            </div>
           </div>
         </div>
-      </section>
 
-      <!-- ── Tab: Contracts ───────────────────────────────────────────────── -->
-      <section v-else-if="activeTab === 'contracts'" class="tab-content">
-        <div class="section-header">
-          <h2 class="section-title">My Contracts</h2>
-          <AppButton variant="secondary" size="sm" @click="goToProducts">
-            Buy New Plan
+        <div class="divider" style="margin: 2rem 0; opacity: 0.2;"></div>
+
+        <!-- Contact Details -->
+        <div class="profile-section">
+          <h2 class="section-title">Contact Details</h2>
+          <div class="form-grid" style="max-width: 520px; margin-bottom: 1.25rem;">
+            <AppInput
+              v-model="contactForm.email"
+              label="Email Address"
+              type="email"
+              :error="contactErrors.email"
+              placeholder="your.email@gmx.de"
+              class="full-width"
+            />
+            <AppInput
+              v-model="contactForm.telephone"
+              label="Telephone"
+              type="tel"
+              :error="contactErrors.telephone"
+              placeholder="+4915123456789"
+              class="full-width"
+            />
+          </div>
+          <AppButton variant="primary" :loading="contactSaving" @click="handleSaveContact" style="margin-bottom: 0.5rem;">
+            Save Contact Details
           </AppButton>
         </div>
 
-        <div v-if="contractStore.loading && contractStore.contracts.length === 0" class="center-state">
-          <AppSpinner size="md" />
+        <div class="divider" style="margin: 2rem 0; opacity: 0.2;"></div>
+
+        <!-- Addresses -->
+        <div class="profile-section">
+          <!-- Main Address -->
+          <div class="address-block" style="margin-bottom: 2rem;">
+            <h2 class="section-title">Main Address</h2>
+            <div class="form-grid" style="margin-bottom: 1.25rem;">
+              <AppInput v-model="addressForm.street"   label="Street"   :error="addressErrors.street"   placeholder="Main Street" />
+              <AppInput v-model="addressForm.number"   label="Number"   :error="addressErrors.number"   placeholder="12a" />
+              <AppInput v-model="addressForm.postcode" label="Postcode" :error="addressErrors.postcode" placeholder="10115" />
+              <AppInput v-model="addressForm.city"     label="City"     :error="addressErrors.city"     placeholder="Berlin" />
+              <AppInput v-model="addressForm.country"  label="Country"  :error="addressErrors.country"  placeholder="Germany" class="full-width" />
+            </div>
+            <AppButton variant="primary" :loading="addressSaving" @click="handleSaveAddress">
+              Save Main Address
+            </AppButton>
+          </div>
+
+          <div class="divider" style="margin: 1.5rem 0; opacity: 0.1;"></div>
+
+          <!-- Billing / Invoice Address -->
+          <div class="address-block">
+            <h2 class="section-title">Billing Address</h2>
+            <div class="form-grid" style="margin-bottom: 1.25rem;">
+              <AppInput v-model="invoiceAddressForm.street"   label="Street"   :error="invoiceAddressErrors.street"   placeholder="Main Street" />
+              <AppInput v-model="invoiceAddressForm.number"   label="Number"   :error="invoiceAddressErrors.number"   placeholder="12a" />
+              <AppInput v-model="invoiceAddressForm.postcode" label="Postcode" :error="invoiceAddressErrors.postcode" placeholder="10115" />
+              <AppInput v-model="invoiceAddressForm.city"     label="City"     :error="invoiceAddressErrors.city"     placeholder="Berlin" />
+              <AppInput v-model="invoiceAddressForm.country"  label="Country"  :error="invoiceAddressErrors.country"  placeholder="Germany" class="full-width" />
+            </div>
+            <AppButton variant="primary" :loading="invoiceAddressSaving" @click="handleSaveInvoiceAddress">
+              Save Billing Address
+            </AppButton>
+          </div>
         </div>
 
-        <div v-else-if="contractStore.contracts.length === 0" class="empty-box">
-          <p class="muted">You have no contracts yet.</p>
-          <AppButton variant="primary" size="sm" @click="goToProducts" style="margin-top: 0.75rem;">
-            Explore Plans
-          </AppButton>
-        </div>
+        <div class="divider" style="margin: 2rem 0; opacity: 0.2;"></div>
 
-        <div v-else class="contracts-list">
-          <div
-            v-for="contract in contractStore.contracts"
-            :key="contract.id"
-            class="contract-row"
-          >
-            <div class="contract-row-info">
-              <ContractStatusBadge :status="contract.status" />
-              <div>
-                <p class="contract-id">Contract <span class="mono">{{ contract.id }}</span></p>
-                <p class="contract-meta">
-                  Product: <span class="mono">{{ contract.productId }}</span>
-                  · Created: {{ formatDate(contract.creationDate) }}
+        <!-- Security & Account -->
+        <div class="profile-section">
+          <h2 class="section-title">Security & Account</h2>
+          <div class="danger-grid" style="margin-top: 1.25rem;">
+            <!-- Account Status Toggle -->
+            <div class="danger-card danger-card--info">
+              <div class="danger-card-text">
+                <h3 class="danger-card-title">Account Status</h3>
+                <p class="danger-card-desc">
+                  Toggle your account status. While inactive, you cannot make purchases, but your existing contracts remain active.
+                </p>
+                <div :class="['status-badge', isProfileActive ? 'status-badge--active' : 'status-badge--inactive']">
+                  {{ customerStore.customer?.status || 'UNKNOWN' }}
+                </div>
+              </div>
+              <label class="switch" title="Toggle Account Status">
+                <input 
+                  type="checkbox" 
+                  :checked="isProfileActive" 
+                  :disabled="customerStore.loading"
+                  @change="handleToggleProfileStatus"
+                />
+                <span class="slider round"></span>
+              </label>
+            </div>
+
+            <!-- Delete -->
+            <div class="danger-card danger-card--danger">
+              <div class="danger-card-text">
+                <h3 class="danger-card-title">Delete Account</h3>
+                <p class="danger-card-desc">
+                  Permanently delete your profile and all related data. This action cannot be undone.
                 </p>
               </div>
+              <AppButton 
+                variant="danger" 
+                :disabled="customerStore.loading" 
+                @click="handleDeleteProfile"
+              >
+                Delete Account
+              </AppButton>
             </div>
-            <AppButton
-              v-if="contract.status === 'INACTIVE'"
-              variant="primary"
-              size="sm"
-              :loading="activeContractLoadingId === contract.id"
-              @click="handleActivateContract(contract.id)"
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Tab: Contracts & Billing ─────────────────────────────────────── -->
+      <section v-else-if="activeTab === 'billing'" class="tab-content">
+        <!-- Contracts list section -->
+        <div class="contracts-section" style="margin-bottom: 3rem;">
+          <div class="section-header">
+            <h2 class="section-title">My Contracts</h2>
+            <AppButton variant="secondary" size="sm" @click="goToProducts">
+              Buy New Plan
+            </AppButton>
+          </div>
+
+          <div v-if="contractStore.loading && contractStore.contracts.length === 0" class="center-state">
+            <AppSpinner size="md" />
+          </div>
+
+          <div v-else-if="contractStore.contracts.length === 0" class="empty-box">
+            <p class="muted">You have no contracts yet.</p>
+            <AppButton variant="primary" size="sm" @click="goToProducts" style="margin-top: 0.75rem;">
+              Explore Plans
+            </AppButton>
+          </div>
+
+          <div v-else class="contracts-list">
+            <div
+              v-for="contract in contractStore.contracts"
+              :key="contract.id"
+              class="contract-row"
             >
-              Activate
-            </AppButton>
-            <span v-else class="active-label">Active ✓</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- ── Tab: Addresses ───────────────────────────────────────────────── -->
-      <section v-else-if="activeTab === 'addresses'" class="tab-content">
-
-        <!-- Main Address -->
-        <div class="address-block">
-          <h2 class="section-title">Main Address</h2>
-          <div class="form-grid">
-            <AppInput v-model="addressForm.street"   label="Street"   :error="addressErrors.street"   placeholder="Main Street" />
-            <AppInput v-model="addressForm.number"   label="Number"   :error="addressErrors.number"   placeholder="12a" />
-            <AppInput v-model="addressForm.postcode" label="Postcode" :error="addressErrors.postcode" placeholder="10115" />
-            <AppInput v-model="addressForm.city"     label="City"     :error="addressErrors.city"     placeholder="Berlin" />
-            <AppInput v-model="addressForm.country"  label="Country"  :error="addressErrors.country"  placeholder="Germany" class="full-width" />
-          </div>
-          <AppButton variant="primary" :loading="addressSaving" @click="handleSaveAddress">
-            Save Main Address
-          </AppButton>
-        </div>
-
-        <div class="divider"></div>
-
-        <!-- Billing / Invoice Address -->
-        <div class="address-block">
-          <h2 class="section-title">Billing Address</h2>
-          <div class="form-grid">
-            <AppInput v-model="invoiceAddressForm.street"   label="Street"   :error="invoiceAddressErrors.street"   placeholder="Main Street" />
-            <AppInput v-model="invoiceAddressForm.number"   label="Number"   :error="invoiceAddressErrors.number"   placeholder="12a" />
-            <AppInput v-model="invoiceAddressForm.postcode" label="Postcode" :error="invoiceAddressErrors.postcode" placeholder="10115" />
-            <AppInput v-model="invoiceAddressForm.city"     label="City"     :error="invoiceAddressErrors.city"     placeholder="Berlin" />
-            <AppInput v-model="invoiceAddressForm.country"  label="Country"  :error="invoiceAddressErrors.country"  placeholder="Germany" class="full-width" />
-          </div>
-          <AppButton variant="primary" :loading="invoiceAddressSaving" @click="handleSaveInvoiceAddress">
-            Save Billing Address
-          </AppButton>
-        </div>
-      </section>
-
-      <!-- ── Tab: Contacts ────────────────────────────────────────────────── -->
-      <section v-else-if="activeTab === 'contacts'" class="tab-content">
-        <h2 class="section-title">Contact Details</h2>
-        <div class="form-grid" style="max-width: 520px;">
-          <AppInput
-            v-model="contactForm.email"
-            label="Email Address"
-            type="email"
-            :error="contactErrors.email"
-            placeholder="your.email@gmx.de"
-            class="full-width"
-          />
-          <AppInput
-            v-model="contactForm.telephone"
-            label="Telephone"
-            type="tel"
-            :error="contactErrors.telephone"
-            placeholder="+4915123456789"
-            class="full-width"
-          />
-        </div>
-        <AppButton variant="primary" :loading="contactSaving" style="margin-top: 1rem;" @click="handleSaveContact">
-          Save Contact Details
-        </AppButton>
-      </section>
-
-      <!-- ── Tab: Invoice ──────────────────────────────────────────────────── -->
-      <section v-else-if="activeTab === 'invoice'" class="tab-content">
-        <div class="section-header">
-          <h2 class="section-title">Invoice</h2>
-          <AppButton variant="primary" :loading="invoiceLoading" @click="handleGenerateInvoice">
-            Generate Invoice
-          </AppButton>
-        </div>
-
-        <AppAlert v-if="invoiceError" type="error" :message="invoiceError" style="margin-bottom: 1rem;" />
-
-        <div v-if="invoice" class="invoice-card">
-          <div class="invoice-header">
-            <div>
-              <p class="invoice-label">Invoice Date</p>
-              <p class="invoice-value">{{ formatDate(invoice.invoiceDate) }}</p>
-            </div>
-            <div>
-              <p class="invoice-label">Brand</p>
-              <p class="invoice-value">{{ invoice.brand }}</p>
-            </div>
-            <div>
-              <p class="invoice-label">Customer ID</p>
-              <p class="invoice-value mono">{{ invoice.customerId }}</p>
-            </div>
-          </div>
-
-          <div class="invoice-items">
-            <h3 class="invoice-subtitle">Line Items</h3>
-            <table class="items-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Contract Date</th>
-                  <th>Setup Fee</th>
-                  <th>Monthly Fee</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="item in invoice.items" :key="item.contractId">
-                  <td>{{ item.productName }}</td>
-                  <td>{{ formatDate(item.contractCreationDate) }}</td>
-                  <td>{{ formatCurrency(item.setupFee) }}</td>
-                  <td>{{ formatCurrency(item.monthlyFee) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="invoice-totals">
-            <div class="total-row">
-              <span>Total Setup Fee</span>
-              <span>{{ formatCurrency(invoice.totalSetupFee) }}</span>
-            </div>
-            <div class="total-row">
-              <span>Total Monthly Fee</span>
-              <span>{{ formatCurrency(invoice.totalMonthlyFee) }}</span>
-            </div>
-            <div v-if="invoice.discount > 0" class="total-row total-row--discount">
-              <span>Discount</span>
-              <span>– {{ formatCurrency(invoice.discount) }}</span>
-            </div>
-            <div class="total-row total-row--grand">
-              <span>Total Amount</span>
-              <span>{{ formatCurrency(invoice.totalAmount) }}</span>
+              <div class="contract-row-info">
+                <ContractStatusBadge :status="contract.status" />
+                <div>
+                  <p class="contract-id">Contract <span class="mono">{{ contract.id }}</span></p>
+                  <p class="contract-meta">
+                    Product: <span class="mono">{{ contract.productId }}</span>
+                    · Created: {{ formatDate(contract.creationDate) }}
+                  </p>
+                </div>
+              </div>
+              <AppButton
+                v-if="contract.status === 'INACTIVE'"
+                variant="primary"
+                size="sm"
+                :loading="activeContractLoadingId === contract.id"
+                @click="handleActivateContract(contract.id)"
+              >
+                Activate
+              </AppButton>
+              <span v-else class="active-label">Active ✓</span>
             </div>
           </div>
         </div>
 
-        <div v-else-if="!invoiceLoading" class="empty-box">
-          <p class="muted">Click "Generate Invoice" to see your billing summary.</p>
-        </div>
-      </section>
+        <div class="divider" style="margin: 2.5rem 0; opacity: 0.2;"></div>
 
-      <!-- ── Tab: Security / Danger Zone ──────────────────────────────────── -->
-      <section v-else-if="activeTab === 'danger'" class="tab-content">
-        <h2 class="section-title">Security & Account</h2>
-
-        <div class="danger-grid">
-          <!-- Activate -->
-          <div class="danger-card danger-card--info">
-            <div class="danger-card-text">
-              <h3 class="danger-card-title">Activate Account</h3>
-              <p class="danger-card-desc">
-                Activate your customer profile to be able to purchase subscriptions.
-              </p>
-            </div>
-            <AppButton
-              variant="primary"
-              :loading="customerStore.loading"
-              :disabled="customerStore.customer?.status === 'ACTIVE'"
-              @click="handleActivateProfile"
-            >
-              {{ customerStore.customer?.status === 'ACTIVE' ? 'Already Active' : 'Activate' }}
+        <!-- Invoice section -->
+        <div class="invoice-section">
+          <div class="section-header">
+            <h2 class="section-title">Invoice</h2>
+            <AppButton variant="primary" :loading="invoiceLoading" @click="handleGenerateInvoice">
+              Generate Invoice
             </AppButton>
           </div>
 
-          <!-- Deactivate -->
-          <div class="danger-card danger-card--warning">
-            <div class="danger-card-text">
-              <h3 class="danger-card-title">Deactivate Account</h3>
-              <p class="danger-card-desc">
-                Suspend your account. Existing contracts remain, but you cannot purchase new ones.
-              </p>
+          <AppAlert v-if="invoiceError" type="error" :message="invoiceError" style="margin-bottom: 1rem;" />
+
+          <div v-if="invoice" class="invoice-card">
+            <div class="invoice-header">
+              <div>
+                <p class="invoice-label">Invoice Date</p>
+                <p class="invoice-value">{{ formatDate(invoice.invoiceDate) }}</p>
+              </div>
+              <div>
+                <p class="invoice-label">Brand</p>
+                <p class="invoice-value">{{ invoice.brand }}</p>
+              </div>
+              <div>
+                <p class="invoice-label">Customer ID</p>
+                <p class="invoice-value mono">{{ invoice.customerId }}</p>
+              </div>
             </div>
-            <AppButton
-              variant="secondary"
-              :disabled="customerStore.customer?.status === 'INACTIVE'"
-              @click="handleDeactivateProfile"
-            >
-              Deactivate
-            </AppButton>
+
+            <div class="invoice-items">
+              <h3 class="invoice-subtitle">Line Items</h3>
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Contract Date</th>
+                    <th>Setup Fee</th>
+                    <th>Monthly Fee</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in invoice.items" :key="item.contractId">
+                    <td>{{ item.productName }}</td>
+                    <td>{{ formatDate(item.contractCreationDate) }}</td>
+                    <td>{{ formatCurrency(item.setupFee) }}</td>
+                    <td>{{ formatCurrency(item.monthlyFee) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="invoice-totals">
+              <div class="total-row">
+                <span>Total Setup Fee</span>
+                <span>{{ formatCurrency(invoice.totalSetupFee) }}</span>
+              </div>
+              <div class="total-row">
+                <span>Total Monthly Fee</span>
+                <span>{{ formatCurrency(invoice.totalMonthlyFee) }}</span>
+              </div>
+              <div v-if="invoice.discount > 0" class="total-row total-row--discount">
+                <span>Discount</span>
+                <span>– {{ formatCurrency(invoice.discount) }}</span>
+              </div>
+              <div class="total-row total-row--grand">
+                <span>Total Amount</span>
+                <span>{{ formatCurrency(invoice.totalAmount) }}</span>
+              </div>
+            </div>
           </div>
 
-          <!-- Delete -->
-          <div class="danger-card danger-card--danger">
-            <div class="danger-card-text">
-              <h3 class="danger-card-title">Delete Account</h3>
-              <p class="danger-card-desc">
-                Permanently delete your profile and all related data. This action cannot be undone.
-              </p>
-            </div>
-            <AppButton variant="danger" @click="handleDeleteProfile">
-              Delete Account
-            </AppButton>
+          <div v-else-if="!invoiceLoading" class="empty-box">
+            <p class="muted">Click "Generate Invoice" to see your billing summary.</p>
           </div>
         </div>
       </section>
@@ -584,6 +702,95 @@ const goToRegister = () => router.push({ name: 'register' })
         </AppButton>
         <AppButton variant="danger" @click="confirmDialog.handleConfirm">
           {{ confirmDialog.confirmText.value }}
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <!-- Custom Delete Profile Confirmation Modal -->
+    <AppModal
+      :open="isDeleteModalOpen"
+      title="Delete Account Permanently"
+      @close="isDeleteModalOpen = false"
+    >
+      <div class="delete-modal-content">
+        <p class="delete-warning-text" style="margin: 0 0 1rem; color: var(--color-error); font-weight: 600;">
+          WARNING: This permanently deletes your customer profile and all related data. This cannot be undone.
+        </p>
+        <div class="delete-confirmation-field">
+          <label for="delete-confirm-modal-input" class="delete-confirm-label">
+            To confirm, type <strong class="delete-keyword">delete</strong> below:
+          </label>
+          <input
+            id="delete-confirm-modal-input"
+            v-model="deleteConfirmText"
+            type="text"
+            placeholder="Type delete to confirm"
+            class="delete-confirm-input"
+            style="width: 100%; margin-top: 0.5rem;"
+          />
+        </div>
+      </div>
+      <template #actions>
+        <AppButton variant="secondary" @click="isDeleteModalOpen = false">
+          Cancel
+        </AppButton>
+        <AppButton
+          variant="danger"
+          :disabled="deleteConfirmText !== 'delete' || customerStore.loading"
+          @click="executeDeleteProfile"
+        >
+          Delete Permanently
+        </AppButton>
+      </template>
+    </AppModal>
+
+    <!-- Save Confirmation Modal -->
+    <AppModal
+      :open="isSaveConfirmModalOpen"
+      :title="saveConfirmData?.title || 'Confirm Changes'"
+      @close="isSaveConfirmModalOpen = false"
+    >
+      <div class="save-confirm-modal-content">
+        <p style="margin: 0 0 1rem; font-weight: 500;">
+          Are you sure you want to change your details? Below is a summary of the detected changes:
+        </p>
+        
+        <div class="changes-list-wrapper" style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--color-border); border-radius: 0.5rem; overflow: hidden; margin-bottom: 1rem;">
+          <table class="changes-table" style="width: 100%; border-collapse: collapse; font-size: 0.9rem; text-align: left;">
+            <thead>
+              <tr style="background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid var(--color-border);">
+                <th style="padding: 0.75rem;">Field</th>
+                <th style="padding: 0.75rem;">Old Value</th>
+                <th style="padding: 0.75rem; color: var(--color-primary);">New Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr 
+                v-for="(change, idx) in saveConfirmData?.changes" 
+                :key="idx"
+                style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);"
+              >
+                <td style="padding: 0.75rem; font-weight: 600;">{{ change.field }}</td>
+                <td style="padding: 0.75rem; color: var(--color-text-muted); text-decoration: line-through;">
+                  {{ change.oldVal || '(empty)' }}
+                </td>
+                <td style="padding: 0.75rem; color: var(--color-success); font-weight: 600;">
+                  {{ change.newVal || '(empty)' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <template #actions>
+        <AppButton variant="secondary" @click="isSaveConfirmModalOpen = false">
+          Cancel
+        </AppButton>
+        <AppButton
+          variant="primary"
+          @click="executeSaveWithConfirmation"
+        >
+          Confirm & Save
         </AppButton>
       </template>
     </AppModal>
@@ -684,6 +891,7 @@ const goToRegister = () => router.push({ name: 'register' })
   border-bottom: 1px solid var(--color-border);
   margin-bottom: 2rem;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 0;
 }
 
@@ -867,6 +1075,126 @@ const goToRegister = () => router.push({ name: 'register' })
 
 .danger-card-title { margin: 0 0 0.3rem; font-size: 1rem; font-weight: 700; color: var(--color-text-main); }
 .danger-card-desc  { margin: 0; font-size: 0.85rem; color: var(--color-text-muted); line-height: 1.5; }
+
+/* Toggle Switch styling */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #334155;
+  transition: .4s;
+  border: 1px solid var(--color-border);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #f8fafc;
+  transition: .4s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+input:checked + .slider {
+  background-color: var(--color-success);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px var(--color-success);
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-top: 0.5rem;
+}
+
+.status-badge--active {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.status-badge--inactive {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.delete-confirmation-field {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.delete-confirm-label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.delete-keyword {
+  color: var(--color-error);
+  background: rgba(239, 68, 68, 0.1);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+}
+
+.delete-confirm-input {
+  max-width: 320px;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg-main);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-main);
+  border-radius: 0.375rem;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+.delete-confirm-input:focus {
+  outline: none;
+  border-color: var(--color-error);
+}
 
 @media (max-width: 640px) {
   .form-grid { grid-template-columns: 1fr; }
