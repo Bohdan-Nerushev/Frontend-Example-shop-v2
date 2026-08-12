@@ -410,6 +410,19 @@ const handleActivateContract = async (contractId: string) => {
   }
 }
 
+const handleDeactivateContract = async (contractId: string) => {
+  activeContractLoadingId.value = contractId
+  try {
+    await contractStore.terminate(contractId)
+    notification.success('Contract deactivated!')
+  } catch {
+    notification.error('Failed to deactivate contract.')
+  } finally {
+    activeContractLoadingId.value = null
+  }
+}
+
+
 // ── Invoice handler ────────────────────────────────────────────────────────────
 const pdfDownloading = ref(false)
 
@@ -858,16 +871,26 @@ const goToRegister = () => router.push({ name: 'register' })
                   </p>
                 </div>
               </div>
-              <AppButton
-                v-if="contract.status === 'INACTIVE'"
-                variant="primary"
-                size="sm"
-                :loading="activeContractLoadingId === contract.id"
-                @click="handleActivateContract(contract.id)"
-              >
-                Activate
-              </AppButton>
-              <span v-else class="active-label">Active ✓</span>
+              <div class="contract-actions">
+                <AppButton
+                  v-if="contract.status === 'INACTIVE'"
+                  variant="primary"
+                  size="sm"
+                  :loading="activeContractLoadingId === contract.id"
+                  @click="handleActivateContract(contract.id)"
+                >
+                  Activate Plan
+                </AppButton>
+                <AppButton
+                  v-else
+                  variant="secondary"
+                  size="sm"
+                  :loading="activeContractLoadingId === contract.id"
+                  @click="handleDeactivateContract(contract.id)"
+                >
+                  Cancel Plan
+                </AppButton>
+              </div>
             </div>
           </div>
         </div>

@@ -9,10 +9,14 @@ const props = withDefaults(
     product: ProductResponse
     loading?: boolean
     buttonText?: string
+    disabled?: boolean
+    variant?: 'primary' | 'secondary' | 'danger'
   }>(),
   {
     loading: false,
     buttonText: 'Purchase',
+    disabled: false,
+    variant: 'primary',
   }
 )
 
@@ -30,7 +34,7 @@ const formattedStorage = computed(() => {
 </script>
 
 <template>
-  <div class="product-card">
+  <div class="product-card" :class="{ 'product-card--disabled': disabled }">
     <div class="card-header">
       <span class="brand-tag">{{ product.brand }}</span>
       <h3 class="product-name">{{ product.name }}</h3>
@@ -60,7 +64,8 @@ const formattedStorage = computed(() => {
     <div class="card-actions">
       <AppButton
         :loading="loading"
-        variant="primary"
+        :variant="variant"
+        :disabled="disabled"
         style="width: 100%;"
         @click="$emit('purchase', product)"
       >

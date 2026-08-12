@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useProductStore } from '../stores/product.store'
 import { useAuthStore } from '../stores/auth.store'
 import { useCustomerStore } from '../stores/customer.store'
+import { useContractStore } from '../stores/contract.store'
 import ProductCard from '../components/product/ProductCard.vue'
 import PurchaseModal from '../components/product/PurchaseModal.vue'
 import AppSelect from '../components/common/AppSelect.vue'
@@ -13,11 +14,15 @@ import AppAlert from '../components/common/AppAlert.vue'
 import { Brand } from '../types/api'
 import type { ProductResponse } from '../types/product'
 
+import { useNotification } from '../composables/useNotification'
+
 const route = useRoute()
 const router = useRouter()
 const productStore = useProductStore()
 const authStore = useAuthStore()
 const customerStore = useCustomerStore()
+const contractStore = useContractStore()
+const notification = useNotification()
 
 const selectedProduct = ref<ProductResponse | null>(null)
 const isPurchaseModalOpen = ref(false)
@@ -39,9 +44,15 @@ const brandOptions = [
   { label: 'Mail Com', value: Brand.MAIL_COM },
 ]
 
-// Load products when component mounts
-const loadProducts = () => {
+// Load products and contracts when component mounts
+const loadProducts = async () => {
   productStore.fetchProducts(selectedBrand.value)
+  if (authStore.isAuthenticated) {
+    if (!customerStore.customer) {
+      await customerStore.fetchCustomerProfile()
+    }
+    contractStore.fetchContracts()
+  }
 }
 
 onMounted(() => {
@@ -62,6 +73,10 @@ watch(
   }
 )
 
+const isProductPurchased = (productId: string): boolean => {
+  return contractStore.contracts.some(c => c.productId === productId && c.status === 'ACTIVE')
+}
+
 const handlePurchase = async (product: ProductResponse) => {
   // If not authenticated, redirect to login with return destination
   if (!authStore.isAuthenticated) {
@@ -72,8 +87,43 @@ const handlePurchase = async (product: ProductResponse) => {
   if (!customerStore.customer) {
     await customerStore.fetchCustomerProfile()
   }
+
+  // Check if there is an existing inactive contract we can just activate
+  const inactiveContract = contractStore.contracts.find(c => c.productId === product.id && c.status === 'INACTIVE')
+  if (inactiveContract) {
+    productStore.loading = true
+    try {
+      await contractStore.activate(inactiveContract.id)
+      notification.success('Product subscription activated successfully!')
+      await contractStore.fetchContracts()
+    } catch {
+      notification.error('Failed to activate subscription.')
+    } finally {
+      productStore.loading = false
+    }
+    return
+  }
+
   selectedProduct.value = product
   isPurchaseModalOpen.value = true
+}
+
+const handleUnsubscribe = async (productId: string) => {
+  const activeContracts = contractStore.contracts.filter(c => c.productId === productId && c.status === 'ACTIVE')
+  if (activeContracts.length === 0) return
+  
+  productStore.loading = true
+  try {
+    for (const contract of activeContracts) {
+      await contractStore.terminate(contract.id)
+    }
+    notification.success('Unsubscribed successfully!')
+    await contractStore.fetchContracts()
+  } catch {
+    notification.error('Failed to unsubscribe.')
+  } finally {
+    productStore.loading = false
+  }
 }
 
 const closePurchaseModal = () => {
@@ -119,7 +169,9 @@ const closePurchaseModal = () => {
           v-for="product in productStore.products"
           :key="product.id"
           :product="product"
-          @purchase="handlePurchase"
+          :button-text="isProductPurchased(product.id) ? 'Unsubscribe from next month' : 'Purchase'"
+          :variant="isProductPurchased(product.id) ? 'secondary' : 'primary'"
+          @purchase="isProductPurchased(product.id) ? handleUnsubscribe(product.id) : handlePurchase(product)"
         />
       </div>
     </template>

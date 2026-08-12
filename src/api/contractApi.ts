@@ -28,4 +28,13 @@ export const contractApi = {
     const response = await http.put<ContractResponse>(`/v1/contracts/${contractId}/${customerId}/activate`)
     return response.data
   },
+
+  /**
+   * Terminate a specific contract subscription.
+   * Endpoint: PUT /v1/contracts/{contractId}/{customerId}/terminate
+   */
+  async terminateContract(contractId: string, customerId: string): Promise<ContractResponse> {
+    const response = await http.put<ContractResponse>(`/v1/contracts/${contractId}/${customerId}/terminate`)
+    return response.data
+  },
 }

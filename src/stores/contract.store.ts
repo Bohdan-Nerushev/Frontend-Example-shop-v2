@@ -88,6 +88,25 @@ export const useContractStore = defineStore('contract', () => {
     }
   }
 
+  const terminate = async (contractId: string) => {
+    const customerId = ensureCustomerId()
+    loading.value = true
+    error.value = null
+    try {
+      await contractApi.terminateContract(contractId, customerId)
+      notificationStore.success('Contract terminated successfully!')
+      await fetchContracts() // Reload contract list
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } } }
+      const errMsg = axiosError.response?.data?.message || 'Contract termination failed'
+      error.value = errMsg
+      notificationStore.error(errMsg)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   const fetchInvoices = async () => {
     const customerId = ensureCustomerId()
     loading.value = true
@@ -141,6 +160,7 @@ export const useContractStore = defineStore('contract', () => {
     fetchContracts,
     purchase,
     activate,
+    terminate,
     fetchInvoices,
     downloadInvoicePdf,
   }
