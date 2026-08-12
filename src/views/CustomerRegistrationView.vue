@@ -26,8 +26,8 @@ onMounted(() => {
 
 const brandOptions = [
   { label: 'GMX Mail', value: Brand.GMX },
-  { label: 'WEB.DE', value: Brand.WEB_DE },
-  { label: 'Mail.com', value: Brand.MAIL_COM },
+  { label: 'WEB DE', value: Brand.WEB_DE },
+  { label: 'Mail Com', value: Brand.MAIL_COM },
 ]
 
 const useSameAddress = ref(true)
@@ -70,8 +70,18 @@ const {
     const errs: Record<string, any> = {}
 
     // 1. General validations
-    if (!values.firstName.trim()) errs.firstName = 'First name is required'
-    if (!values.lastName.trim()) errs.lastName = 'Last name is required'
+    if (!values.firstName.trim()) {
+      errs.firstName = 'First name is required'
+    } else if (values.firstName.length > 100) {
+      errs.firstName = 'First name must not exceed 100 characters'
+    }
+
+    if (!values.lastName.trim()) {
+      errs.lastName = 'Last name is required'
+    } else if (values.lastName.length > 100) {
+      errs.lastName = 'Last name must not exceed 100 characters'
+    }
+
     if (!values.birthDate) {
       errs.birthDate = 'Birth date is required'
     } else if (!isValidBirthDate(values.birthDate)) {
@@ -80,15 +90,38 @@ const {
 
     // 2. Main Address validations
     const addrErrs: Record<string, string> = {}
-    if (!values.address.street.trim()) addrErrs.street = 'Street is required'
-    if (!values.address.number.trim()) addrErrs.number = 'Number is required'
+    if (!values.address.street.trim()) {
+      addrErrs.street = 'Street is required'
+    } else if (values.address.street.length > 250) {
+      addrErrs.street = 'Street must not exceed 250 characters'
+    }
+
+    if (!values.address.number.trim()) {
+      addrErrs.number = 'Number is required'
+    } else if (values.address.number.length > 100) {
+      addrErrs.number = 'Number must not exceed 100 characters'
+    }
+
     if (!values.address.postcode.trim()) {
       addrErrs.postcode = 'Postcode is required'
+    } else if (values.address.postcode.length > 100) {
+      addrErrs.postcode = 'Postcode must not exceed 100 characters'
     } else if (!/^\d+$/.test(values.address.postcode)) {
       addrErrs.postcode = 'Must contain only digits'
     }
-    if (!values.address.city.trim()) addrErrs.city = 'City is required'
-    if (!values.address.country.trim()) addrErrs.country = 'Country is required'
+
+    if (!values.address.city.trim()) {
+      addrErrs.city = 'City is required'
+    } else if (values.address.city.length > 100) {
+      addrErrs.city = 'City must not exceed 100 characters'
+    }
+
+    if (!values.address.country.trim()) {
+      addrErrs.country = 'Country is required'
+    } else if (values.address.country.length < 2 || values.address.country.length > 100) {
+      addrErrs.country = 'Country must be between 2 and 100 characters'
+    }
+
     if (Object.keys(addrErrs).length > 0) {
       errs.address = addrErrs
     }
@@ -96,15 +129,38 @@ const {
     // 3. Billing Address validations (if separate)
     if (!useSameAddress.value && values.invoiceAddress) {
       const invAddrErrs: Record<string, string> = {}
-      if (!values.invoiceAddress.street.trim()) invAddrErrs.street = 'Street is required'
-      if (!values.invoiceAddress.number.trim()) invAddrErrs.number = 'Number is required'
+      if (!values.invoiceAddress.street.trim()) {
+        invAddrErrs.street = 'Street is required'
+      } else if (values.invoiceAddress.street.length > 250) {
+        invAddrErrs.street = 'Street must not exceed 250 characters'
+      }
+
+      if (!values.invoiceAddress.number.trim()) {
+        invAddrErrs.number = 'Number is required'
+      } else if (values.invoiceAddress.number.length > 100) {
+        invAddrErrs.number = 'Number must not exceed 100 characters'
+      }
+
       if (!values.invoiceAddress.postcode.trim()) {
         invAddrErrs.postcode = 'Postcode is required'
+      } else if (values.invoiceAddress.postcode.length > 100) {
+        invAddrErrs.postcode = 'Postcode must not exceed 100 characters'
       } else if (!/^\d+$/.test(values.invoiceAddress.postcode)) {
         invAddrErrs.postcode = 'Must contain only digits'
       }
-      if (!values.invoiceAddress.city.trim()) invAddrErrs.city = 'City is required'
-      if (!values.invoiceAddress.country.trim()) invAddrErrs.country = 'Country is required'
+
+      if (!values.invoiceAddress.city.trim()) {
+        invAddrErrs.city = 'City is required'
+      } else if (values.invoiceAddress.city.length > 100) {
+        invAddrErrs.city = 'City must not exceed 100 characters'
+      }
+
+      if (!values.invoiceAddress.country.trim()) {
+        invAddrErrs.country = 'Country is required'
+      } else if (values.invoiceAddress.country.length < 2 || values.invoiceAddress.country.length > 100) {
+        invAddrErrs.country = 'Country must be between 2 and 100 characters'
+      }
+
       if (Object.keys(invAddrErrs).length > 0) {
         errs.invoiceAddress = invAddrErrs
       }
@@ -116,6 +172,8 @@ const {
       commErrs.email = 'Email is required'
     } else if (!isValidEmail(values.communicationDetails.email)) {
       commErrs.email = 'Provide a valid email address'
+    } else if (values.communicationDetails.email.length > 255) {
+      commErrs.email = 'Email must not exceed 255 characters'
     }
 
     if (!values.communicationDetails.telephone.trim()) {
@@ -123,6 +181,7 @@ const {
     } else if (!isValidPhone(values.communicationDetails.telephone)) {
       commErrs.telephone = 'Length 5-30, digits, spaces or hyphens only'
     }
+
     if (Object.keys(commErrs).length > 0) {
       errs.communicationDetails = commErrs
     }

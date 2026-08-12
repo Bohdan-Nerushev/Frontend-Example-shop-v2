@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive, computed } from 'vue'
+import { onMounted, ref, reactive, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCustomerStore } from '../stores/customer.store'
 import { useAuthStore } from '../stores/auth.store'
@@ -7,6 +7,7 @@ import { useContractStore } from '../stores/contract.store'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useNotification } from '../composables/useNotification'
 import { formatDate, formatCurrency } from '../utils/formatters'
+import { isValidEmail, isValidPhone } from '../utils/validators'
 import AppSpinner from '../components/common/AppSpinner.vue'
 import AppAlert from '../components/common/AppAlert.vue'
 import AppButton from '../components/common/AppButton.vue'
@@ -106,21 +107,102 @@ onMounted(async () => {
   }
 })
 
+watch(() => customerStore.customer, (newVal) => {
+  if (newVal) {
+    populateForms()
+  }
+}, { deep: true })
+
+const isAddressChanged = computed(() => {
+  const c = customerStore.customer
+  if (!c || !c.address) return false
+  return (
+    addressForm.street.trim() !== (c.address.street ?? '').trim() ||
+    addressForm.number.trim() !== (c.address.number ?? '').trim() ||
+    addressForm.postcode.trim() !== (c.address.postcode ?? '').trim() ||
+    addressForm.city.trim() !== (c.address.city ?? '').trim() ||
+    addressForm.country.trim() !== (c.address.country ?? '').trim()
+  )
+})
+
+const isInvoiceAddressChanged = computed(() => {
+  const c = customerStore.customer
+  if (!c) return false
+  const inv = c.invoiceAddress ?? c.address ?? {}
+  return (
+    invoiceAddressForm.street.trim() !== (inv.street ?? '').trim() ||
+    invoiceAddressForm.number.trim() !== (inv.number ?? '').trim() ||
+    invoiceAddressForm.postcode.trim() !== (inv.postcode ?? '').trim() ||
+    invoiceAddressForm.city.trim() !== (inv.city ?? '').trim() ||
+    invoiceAddressForm.country.trim() !== (inv.country ?? '').trim()
+  )
+})
+
+const isContactChanged = computed(() => {
+  const c = customerStore.customer
+  if (!c || !c.communicationDetails) return false
+  return (
+    contactForm.email.trim().toLowerCase() !== (c.communicationDetails.email ?? '').trim().toLowerCase() ||
+    contactForm.telephone.trim() !== (c.communicationDetails.telephone ?? '').trim()
+  )
+})
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const validateAddress = (form: AddressRequest) => {
   const errs: Partial<Record<keyof AddressRequest, string>> = {}
-  if (!form.street.trim())   errs.street   = 'Street is required'
-  if (!form.number.trim())   errs.number   = 'Number is required'
-  if (!form.postcode.trim()) errs.postcode = 'Postcode is required'
-  if (!form.city.trim())     errs.city     = 'City is required'
-  if (!form.country.trim())  errs.country  = 'Country is required'
+  
+  if (!form.street.trim()) {
+    errs.street = 'Street is required'
+  } else if (form.street.length > 250) {
+    errs.street = 'Street must not exceed 250 characters'
+  }
+
+  if (!form.number.trim()) {
+    errs.number = 'Number is required'
+  } else if (form.number.length > 100) {
+    errs.number = 'Number must not exceed 100 characters'
+  }
+
+  if (!form.postcode.trim()) {
+    errs.postcode = 'Postcode is required'
+  } else if (form.postcode.length > 100) {
+    errs.postcode = 'Postcode must not exceed 100 characters'
+  } else if (!/^\d+$/.test(form.postcode)) {
+    errs.postcode = 'Must contain only digits'
+  }
+
+  if (!form.city.trim()) {
+    errs.city = 'City is required'
+  } else if (form.city.length > 100) {
+    errs.city = 'City must not exceed 100 characters'
+  }
+
+  if (!form.country.trim()) {
+    errs.country = 'Country is required'
+  } else if (form.country.length < 2 || form.country.length > 100) {
+    errs.country = 'Country must be between 2 and 100 characters'
+  }
+
   return errs
 }
 
 const validateContact = (form: CommunicationDetails) => {
   const errs: Partial<Record<keyof CommunicationDetails, string>> = {}
-  if (!form.email.trim())     errs.email     = 'Email is required'
-  if (!form.telephone.trim()) errs.telephone = 'Telephone is required'
+  
+  if (!form.email.trim()) {
+    errs.email = 'Email is required'
+  } else if (!isValidEmail(form.email)) {
+    errs.email = 'Provide a valid email address'
+  } else if (form.email.length > 255) {
+    errs.email = 'Email must not exceed 255 characters'
+  }
+
+  if (!form.telephone.trim()) {
+    errs.telephone = 'Phone number is required'
+  } else if (!isValidPhone(form.telephone)) {
+    errs.telephone = 'Length 5-30, digits, spaces or hyphens only'
+  }
+
   return errs
 }
 
@@ -468,7 +550,7 @@ const goToRegister = () => router.push({ name: 'register' })
               class="full-width"
             />
           </div>
-          <AppButton variant="primary" :loading="contactSaving" @click="handleSaveContact" style="margin-bottom: 0.5rem;">
+          <AppButton variant="primary" :loading="contactSaving" :disabled="!isContactChanged" @click="handleSaveContact" style="margin-bottom: 0.5rem;">
             Save Contact Details
           </AppButton>
         </div>
@@ -487,7 +569,7 @@ const goToRegister = () => router.push({ name: 'register' })
               <AppInput v-model="addressForm.city"     label="City"     :error="addressErrors.city"     placeholder="Berlin" />
               <AppInput v-model="addressForm.country"  label="Country"  :error="addressErrors.country"  placeholder="Germany" class="full-width" />
             </div>
-            <AppButton variant="primary" :loading="addressSaving" @click="handleSaveAddress">
+            <AppButton variant="primary" :loading="addressSaving" :disabled="!isAddressChanged" @click="handleSaveAddress">
               Save Main Address
             </AppButton>
           </div>
@@ -504,7 +586,7 @@ const goToRegister = () => router.push({ name: 'register' })
               <AppInput v-model="invoiceAddressForm.city"     label="City"     :error="invoiceAddressErrors.city"     placeholder="Berlin" />
               <AppInput v-model="invoiceAddressForm.country"  label="Country"  :error="invoiceAddressErrors.country"  placeholder="Germany" class="full-width" />
             </div>
-            <AppButton variant="primary" :loading="invoiceAddressSaving" @click="handleSaveInvoiceAddress">
+            <AppButton variant="primary" :loading="invoiceAddressSaving" :disabled="!isInvoiceAddressChanged" @click="handleSaveInvoiceAddress">
               Save Billing Address
             </AppButton>
           </div>
@@ -755,31 +837,32 @@ const goToRegister = () => router.push({ name: 'register' })
           Are you sure you want to change your details? Below is a summary of the detected changes:
         </p>
         
-        <div class="changes-list-wrapper" style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--color-border); border-radius: 0.5rem; overflow: hidden; margin-bottom: 1rem;">
-          <table class="changes-table" style="width: 100%; border-collapse: collapse; font-size: 0.9rem; text-align: left;">
-            <thead>
-              <tr style="background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid var(--color-border);">
-                <th style="padding: 0.75rem;">Field</th>
-                <th style="padding: 0.75rem;">Old Value</th>
-                <th style="padding: 0.75rem; color: var(--color-primary);">New Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr 
-                v-for="(change, idx) in saveConfirmData?.changes" 
-                :key="idx"
-                style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);"
-              >
-                <td style="padding: 0.75rem; font-weight: 600;">{{ change.field }}</td>
-                <td style="padding: 0.75rem; color: var(--color-text-muted); text-decoration: line-through;">
+        <div class="changes-list-wrapper" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem; max-height: 350px; overflow-y: auto;">
+          <div 
+            v-for="(change, idx) in saveConfirmData?.changes" 
+            :key="idx"
+            style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--color-border); border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem;"
+          >
+            <div>
+              <span style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 0.15rem;">Field Name</span>
+              <span style="font-size: 0.95rem; font-weight: bold; color: var(--color-primary);">{{ change.field }}</span>
+            </div>
+            
+            <div style="border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem;">
+              <div>
+                <span style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600; text-transform: uppercase; display: inline-block; width: 85px;">Old Value:</span>
+                <span style="font-size: 0.95rem; color: var(--color-text-muted); text-decoration: line-through; word-break: break-all;">
                   {{ change.oldVal || '(empty)' }}
-                </td>
-                <td style="padding: 0.75rem; color: var(--color-success); font-weight: 600;">
+                </span>
+              </div>
+              <div>
+                <span style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600; text-transform: uppercase; display: inline-block; width: 85px;">New Value:</span>
+                <span style="font-size: 0.95rem; color: var(--color-success); font-weight: bold; word-break: break-all;">
                   {{ change.newVal || '(empty)' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <template #actions>

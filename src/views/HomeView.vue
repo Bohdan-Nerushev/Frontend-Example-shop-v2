@@ -10,8 +10,8 @@ const selectedBrand = ref<Brand>(Brand.GMX)
 
 const brandOptions = [
   { label: 'GMX Mail', value: Brand.GMX },
-  { label: 'WEB.DE', value: Brand.WEB_DE },
-  { label: 'Mail.com', value: Brand.MAIL_COM },
+  { label: 'WEB DE', value: Brand.WEB_DE },
+  { label: 'Mail Com', value: Brand.MAIL_COM },
 ]
 
 const viewProducts = () => {
