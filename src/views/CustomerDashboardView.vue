@@ -411,6 +411,8 @@ const handleActivateContract = async (contractId: string) => {
 }
 
 // ── Invoice handler ────────────────────────────────────────────────────────────
+const pdfDownloading = ref(false)
+
 const handleGenerateInvoice = async () => {
   if (!customerStore.customer) return
   invoiceLoading.value = true
@@ -425,6 +427,27 @@ const handleGenerateInvoice = async () => {
     invoiceLoading.value = false
   }
 }
+
+const handleDownloadPdf = async () => {
+  if (!customerStore.customer) return
+  pdfDownloading.value = true
+  try {
+    const { blob, filename } = await billingApi.downloadInvoicePdf(customerStore.customer.id)
+    const objectUrl = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = filename
+    anchor.click()
+    URL.revokeObjectURL(objectUrl)
+    notification.success('Invoice PDF downloaded successfully!')
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { message?: string } } }
+    notification.error(e.response?.data?.message ?? 'Failed to download invoice PDF')
+  } finally {
+    pdfDownloading.value = false
+  }
+}
+
 
 // ── Profile activation / deactivation / delete ────────────────────────────────
 const deleteConfirmText = ref('')
@@ -855,9 +878,19 @@ const goToRegister = () => router.push({ name: 'register' })
         <div class="invoice-section">
           <div class="section-header">
             <h2 class="section-title">Invoice</h2>
-            <AppButton variant="primary" :loading="invoiceLoading" @click="handleGenerateInvoice">
-              Generate Invoice
-            </AppButton>
+            <div class="invoice-actions" style="display: flex; gap: 0.75rem;">
+              <AppButton variant="secondary" :loading="invoiceLoading" @click="handleGenerateInvoice">
+                Generate Invoice
+              </AppButton>
+              <AppButton
+                v-if="invoice"
+                variant="primary"
+                :loading="pdfDownloading"
+                @click="handleDownloadPdf"
+              >
+                Download Invoice PDF
+              </AppButton>
+            </div>
           </div>
 
           <AppAlert v-if="invoiceError" type="error" :message="invoiceError" style="margin-bottom: 1rem;" />

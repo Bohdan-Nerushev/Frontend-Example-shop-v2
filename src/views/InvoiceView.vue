@@ -42,23 +42,43 @@ const handleGenerateInvoice = async () => {
     console.error('Invoice generation failed', e)
   }
 }
+
+const handleDownloadPdf = async () => {
+  try {
+    await contractStore.downloadInvoicePdf()
+  } catch (e) {
+    // Error is already handled and shown via notificationStore inside the action
+    console.error('PDF download failed', e)
+  }
+}
 </script>
 
 <template>
   <div class="invoice-view">
     <header class="invoice-header">
       <div>
-        <h1 class="view-title">Billing & Invoices</h1>
+        <h1 class="view-title">Billing &amp; Invoices</h1>
         <p class="view-subtitle">Generate and inspect your monthly subscription billing summaries.</p>
       </div>
-      <AppButton
-        v-if="invoice"
-        variant="secondary"
-        :loading="contractStore.loading"
-        @click="handleGenerateInvoice"
-      >
-        🔄 Recalculate Invoice
-      </AppButton>
+      <div v-if="invoice" class="header-actions">
+        <AppButton
+          variant="secondary"
+          :loading="contractStore.loading"
+          @click="handleGenerateInvoice"
+        >
+          🔄 Recalculate Invoice
+        </AppButton>
+        <AppButton
+          variant="primary"
+          :loading="contractStore.pdfLoading"
+          :disabled="contractStore.pdfLoading"
+          class="btn-download-pdf"
+          @click="handleDownloadPdf"
+        >
+          <span class="btn-icon">⬇</span>
+          {{ contractStore.pdfLoading ? 'Generating PDF…' : 'Download Invoice PDF' }}
+        </AppButton>
+      </div>
     </header>
 
     <!-- LOADING STATE -->
@@ -88,7 +108,20 @@ const handleGenerateInvoice = async () => {
         <!-- Invoice Header metadata -->
         <div class="paper-top">
           <div class="brand-badge">{{ invoice.brand }} INVOICE</div>
-          <div class="meta-date">Date: <strong>{{ invoice.invoiceDate }}</strong></div>
+          <div class="paper-top-right">
+            <div class="meta-date">Date: <strong>{{ invoice.invoiceDate }}</strong></div>
+            <!-- Inline PDF download button inside invoice card (alternative access point) -->
+            <button
+              class="pdf-inline-btn"
+              :disabled="contractStore.pdfLoading"
+              :aria-label="contractStore.pdfLoading ? 'Generating PDF, please wait' : 'Download Invoice as PDF'"
+              @click="handleDownloadPdf"
+            >
+              <span v-if="contractStore.pdfLoading" class="pdf-btn-spinner" aria-hidden="true">⏳</span>
+              <span v-else aria-hidden="true">📄</span>
+              {{ contractStore.pdfLoading ? 'Generating…' : 'Download PDF' }}
+            </button>
+          </div>
         </div>
 
         <!-- Address details -->
@@ -188,6 +221,22 @@ const handleGenerateInvoice = async () => {
   margin: 0;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Download PDF button accent */
+.btn-download-pdf {
+  gap: 0.4rem;
+}
+
+.btn-icon {
+  font-size: 0.9rem;
+}
+
 .spinner-container {
   display: flex;
   flex-direction: column;
@@ -222,6 +271,12 @@ const handleGenerateInvoice = async () => {
   padding-bottom: 1rem;
 }
 
+.paper-top-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .brand-badge {
   font-size: 0.85rem;
   font-weight: 750;
@@ -235,6 +290,33 @@ const handleGenerateInvoice = async () => {
 .meta-date {
   font-size: 0.875rem;
   color: var(--color-text-muted);
+}
+
+/* Inline PDF button (compact, inside invoice card) */
+.pdf-inline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-primary, #38bdf8);
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 5px;
+  padding: 0.3rem 0.65rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+  white-space: nowrap;
+}
+
+.pdf-inline-btn:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.pdf-inline-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .addresses-grid {
@@ -315,6 +397,19 @@ const handleGenerateInvoice = async () => {
   .invoice-header {
     flex-direction: column;
     align-items: stretch;
+  }
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .paper-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .paper-top-right {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 </style>

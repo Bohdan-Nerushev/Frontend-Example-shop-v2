@@ -12,6 +12,9 @@ export const useContractStore = defineStore('contract', () => {
   const invoices = ref<InvoiceResponse[]>([])
   const loading = ref<boolean>(false)
   const error = ref<string | null>(null)
+  // Separate loading/error state for PDF download to avoid UI conflict with main loading indicator
+  const pdfLoading = ref<boolean>(false)
+  const pdfError = ref<string | null>(null)
 
   const customerStore = useCustomerStore()
   const notificationStore = useNotificationStore()
@@ -102,14 +105,43 @@ export const useContractStore = defineStore('contract', () => {
     }
   }
 
+  const downloadInvoicePdf = async () => {
+    const customerId = ensureCustomerId()
+    pdfLoading.value = true
+    pdfError.value = null
+    try {
+      const { blob, filename } = await billingApi.downloadInvoicePdf(customerId)
+
+      // Trigger browser download via a temporary anchor element (standard cross-browser approach)
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = objectUrl
+      anchor.download = filename
+      anchor.click()
+      URL.revokeObjectURL(objectUrl)
+
+      notificationStore.success('Invoice PDF downloaded successfully!')
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { message?: string } } }
+      const errMsg = axiosError.response?.data?.message || 'Failed to download invoice PDF'
+      pdfError.value = errMsg
+      notificationStore.error(errMsg)
+    } finally {
+      pdfLoading.value = false
+    }
+  }
+
   return {
     contracts,
     invoices,
     loading,
     error,
+    pdfLoading,
+    pdfError,
     fetchContracts,
     purchase,
     activate,
     fetchInvoices,
+    downloadInvoicePdf,
   }
 })
