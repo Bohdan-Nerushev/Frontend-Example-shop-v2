@@ -3,7 +3,9 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProductStore } from '../stores/product.store'
 import { useAuthStore } from '../stores/auth.store'
+import { useCustomerStore } from '../stores/customer.store'
 import ProductCard from '../components/product/ProductCard.vue'
+import PurchaseModal from '../components/product/PurchaseModal.vue'
 import AppSelect from '../components/common/AppSelect.vue'
 import AppSpinner from '../components/common/AppSpinner.vue'
 import AppEmptyState from '../components/common/AppEmptyState.vue'
@@ -15,6 +17,10 @@ const route = useRoute()
 const router = useRouter()
 const productStore = useProductStore()
 const authStore = useAuthStore()
+const customerStore = useCustomerStore()
+
+const selectedProduct = ref<ProductResponse | null>(null)
+const isPurchaseModalOpen = ref(false)
 
 // Read initial brand from URL query or fallback to GMX
 const getBrandFromQuery = (): Brand => {
@@ -56,17 +62,23 @@ watch(
   }
 )
 
-const handlePurchase = (product: ProductResponse) => {
+const handlePurchase = async (product: ProductResponse) => {
+  // If not authenticated, redirect to login with return destination
   if (!authStore.isAuthenticated) {
-    // Redirect to login flow if guest
-    authStore.login()
-  } else {
-    // If authenticated, go to contracts and pass the product ID as query param
-    router.push({
-      name: 'contracts',
-      query: { buy: product.id },
-    })
+    router.push({ name: 'login', query: { redirect: 'products', brand: selectedBrand.value } })
+    return
   }
+  // Ensure customer profile is loaded before opening modal
+  if (!customerStore.customer) {
+    await customerStore.fetchCustomerProfile()
+  }
+  selectedProduct.value = product
+  isPurchaseModalOpen.value = true
+}
+
+const closePurchaseModal = () => {
+  isPurchaseModalOpen.value = false
+  selectedProduct.value = null
 }
 </script>
 
@@ -112,6 +124,13 @@ const handlePurchase = (product: ProductResponse) => {
       </div>
     </template>
   </div>
+
+  <!-- Purchase confirmation modal -->
+  <PurchaseModal
+    :open="isPurchaseModalOpen"
+    :product="selectedProduct"
+    @close="closePurchaseModal"
+  />
 </template>
 
 <style scoped>

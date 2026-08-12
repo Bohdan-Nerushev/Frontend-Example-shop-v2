@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCustomerStore } from '../stores/customer.store'
+import { useAuthStore } from '../stores/auth.store'
 import { useForm } from '../composables/useForm'
 import { isValidEmail, isValidPhone, isValidBirthDate } from '../utils/validators'
 import AddressForm from '../components/customer/AddressForm.vue'
@@ -15,6 +16,13 @@ import type { CustomerRequest, AddressRequest } from '../types/customer'
 
 const router = useRouter()
 const customerStore = useCustomerStore()
+const authStore = useAuthStore()
+
+onMounted(() => {
+  // Clear any stale tokens/session from memory before registration
+  authStore.clearAuth()
+  customerStore.customer = null
+})
 
 const brandOptions = [
   { label: 'GMX Mail', value: Brand.GMX },
@@ -171,7 +179,7 @@ const onRegisterSubmit = () => {
 }
 
 const goToLogin = () => {
-  router.push({ name: 'dashboard' })
+  router.push({ name: 'login' })
 }
 </script>
 

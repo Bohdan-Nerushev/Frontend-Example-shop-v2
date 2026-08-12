@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import keycloak from '../auth/keycloak'
 import axios from 'axios'
+import router from '../router'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(null)
@@ -17,9 +18,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   const logout = () => {
     clearAuth()
-    keycloak.logout({
-      redirectUri: window.location.origin,
-    })
+    // Navigate to home via Vue Router instead of calling keycloak.logout().
+    // keycloak.logout() causes a full browser page reload via redirect, which
+    // also disrupts the registration success screen and other Vue-managed views.
+    // Since tokens live only in Pinia memory refs (not persisted), clearing them
+    // is sufficient to end the client session for our password-grant flow.
+    router.push({ name: 'home' })
   }
 
   const setToken = (accessToken: string, refToken: string) => {
@@ -47,16 +51,19 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const initAuth = (): Promise<boolean> => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const timeout = setTimeout(() => {
         console.warn('Keycloak initialization timed out (3s). Proceeding in offline mode.')
         resolve(false)
       }, 3000)
 
+      // Use onLoad:'none' to prevent Keycloak from automatically redirecting the browser
+      // when it detects a new SSO session (e.g. right after registration).
+      // Token management is handled manually via loginWithCredentials.
+      // NOTE: omitting onLoad entirely is equivalent to 'none' — Keycloak-JS does not
+      // accept 'none' as a valid KeycloakOnLoad type value.
       keycloak
         .init({
-          onLoad: 'check-sso',
-          silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
           pkceMethod: 'S256',
         })
         .then((authenticated) => {
@@ -69,7 +76,8 @@ export const useAuthStore = defineStore('auth', () => {
         .catch((error) => {
           clearTimeout(timeout)
           console.error('Keycloak initialization failed', error)
-          reject(error)
+          // Resolve false instead of rejecting so the app still boots
+          resolve(false)
         })
     })
   }

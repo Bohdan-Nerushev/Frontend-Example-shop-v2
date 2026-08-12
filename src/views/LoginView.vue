@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
 import { useForm } from '../composables/useForm'
 import { isValidEmail } from '../utils/validators'
@@ -9,6 +9,7 @@ import AppButton from '../components/common/AppButton.vue'
 import AppAlert from '../components/common/AppAlert.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const loginError = ref<string | null>(null)
 
@@ -45,8 +46,17 @@ const onLoginSubmit = () => {
     try {
       const success = await authStore.loginWithCredentials(values.email, values.password)
       if (success) {
-        // Redirect to dashboard on successful login
-        router.push({ name: 'dashboard' })
+        const redirect = route.query.redirect as string
+        if (redirect) {
+          // Destructure redirect from other query params so we don't pass it along to the next view
+          const { redirect: _, ...query } = route.query
+          router.push({
+            name: redirect,
+            query,
+          })
+        } else {
+          router.push({ name: 'dashboard' })
+        }
       }
     } catch (err: any) {
       loginError.value = err.message || 'Login failed. Please check your credentials.'

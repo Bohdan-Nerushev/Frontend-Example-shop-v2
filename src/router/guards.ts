@@ -11,7 +11,13 @@ export function setupGuards(router: Router) {
       if (authStore.isAuthenticated) {
         next()
       } else {
-        next({ name: 'login' })
+        next({
+          name: 'login',
+          query: {
+            redirect: to.name as string,
+            ...to.query,
+          },
+        })
       }
     } else {
       next()

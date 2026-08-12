@@ -35,4 +35,18 @@ http.interceptors.request.use(
   }
 )
 
+// Response Interceptor: handle 401 Unauthorized errors
+http.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      const authStore = useAuthStore()
+      authStore.logout()
+      // Redirect to login page, avoiding router circular dependencies
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
 export default http

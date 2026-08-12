@@ -22,7 +22,9 @@ defineEmits<{
 
 // Use central storage formatter
 const formattedStorage = computed(() => {
-  const formatted = formatStorageSize(props.product.storageSize)
+  if (!props.product.storageSize) return null
+  const bytes = props.product.storageSize * 1024 * 1024 * 1024
+  const formatted = formatStorageSize(bytes)
   return formatted === '-' ? null : formatted
 })
 </script>

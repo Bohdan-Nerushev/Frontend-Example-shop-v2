@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useContractStore } from '../stores/contract.store'
 import { useCustomerStore } from '../stores/customer.store'
 import { useProductStore } from '../stores/product.store'
@@ -13,7 +13,6 @@ import AppEmptyState from '../components/common/AppEmptyState.vue'
 import AppAlert from '../components/common/AppAlert.vue'
 import AppModal from '../components/common/AppModal.vue'
 
-const route = useRoute()
 const router = useRouter()
 const contractStore = useContractStore()
 const customerStore = useCustomerStore()
@@ -22,7 +21,6 @@ const notification = useNotification()
 
 const isPurchaseModalOpen = ref(false)
 const activeContractLoadingId = ref<string | null>(null)
-const isBuyingFromUrl = ref(false)
 
 const loadData = async () => {
   // Ensure profile is loaded first because contracts need customer ID
@@ -32,21 +30,6 @@ const loadData = async () => {
 
   if (customerStore.customer) {
     await contractStore.fetchContracts()
-    
-    // Check if redirect contains auto-buy request from ProductsView
-    const buyProductId = route.query.buy as string
-    if (buyProductId) {
-      isBuyingFromUrl.value = true
-      try {
-        // Clear query parameters first so page refresh doesn't trigger repeat purchase
-        router.replace({ query: {} })
-        await contractStore.purchase(buyProductId)
-      } catch (err) {
-        console.error('Auto purchase failed', err)
-      } finally {
-        isBuyingFromUrl.value = false
-      }
-    }
   } else {
     // If no profile, redirect to dashboard which shows the "Register profile" callout
     router.push({ name: 'dashboard' })

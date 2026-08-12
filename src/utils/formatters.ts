@@ -57,7 +57,7 @@ export function formatStorageSize(bytes: number | null | undefined): string {
     return `${(bytes / 1024).toFixed(0)} KB`
   }
 
-  // For MB and above, show rounded numbers or 1 decimal if less than 10
-  const decimals = size < 10 && unitIndex > 1 ? 1 : 0
+  // For MB and above, show rounded numbers or 1 decimal if less than 10 (only if not a whole number)
+  const decimals = size < 10 && unitIndex > 1 && size % 1 !== 0 ? 1 : 0
   return `${size.toFixed(decimals)} ${units[unitIndex]}`
 }

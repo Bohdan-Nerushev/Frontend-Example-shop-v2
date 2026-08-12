@@ -77,7 +77,8 @@ export const useCustomerStore = defineStore('customer', () => {
     loading.value = true
     error.value = null
     try {
-      customer.value = await customerApi.updateAddress(customer.value.id, data)
+      await customerApi.updateAddress(customer.value.id, data)
+      await fetchCustomerProfile()
       notificationStore.success('Address updated successfully!')
     } catch (err: unknown) {
       logDetailedError('updateAddress', err)
@@ -96,7 +97,8 @@ export const useCustomerStore = defineStore('customer', () => {
     loading.value = true
     error.value = null
     try {
-      customer.value = await customerApi.updateInvoiceAddress(customer.value.id, data)
+      await customerApi.updateInvoiceAddress(customer.value.id, data)
+      await fetchCustomerProfile()
       notificationStore.success('Billing address updated successfully!')
     } catch (err: unknown) {
       logDetailedError('updateInvoiceAddress', err)
@@ -115,7 +117,8 @@ export const useCustomerStore = defineStore('customer', () => {
     loading.value = true
     error.value = null
     try {
-      customer.value = await customerApi.updateCommunicationDetails(customer.value.id, data)
+      await customerApi.updateCommunicationDetails(customer.value.id, data)
+      await fetchCustomerProfile()
       notificationStore.success('Contact details updated successfully!')
     } catch (err: unknown) {
       logDetailedError('updateCommunication', err)
@@ -134,7 +137,8 @@ export const useCustomerStore = defineStore('customer', () => {
     loading.value = true
     error.value = null
     try {
-      customer.value = await customerApi.activateCustomer(customer.value.id)
+      await customerApi.activateCustomer(customer.value.id)
+      await fetchCustomerProfile()
       notificationStore.success('Profile activated successfully!')
     } catch (err: unknown) {
       logDetailedError('activate', err)
@@ -153,7 +157,8 @@ export const useCustomerStore = defineStore('customer', () => {
     loading.value = true
     error.value = null
     try {
-      customer.value = await customerApi.deactivateCustomer(customer.value.id)
+      await customerApi.deactivateCustomer(customer.value.id)
+      await fetchCustomerProfile()
       notificationStore.success('Profile deactivated successfully!')
     } catch (err: unknown) {
       logDetailedError('deactivate', err)
