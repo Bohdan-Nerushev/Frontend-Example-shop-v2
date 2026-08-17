@@ -16,6 +16,7 @@ import AppModal from '../components/common/AppModal.vue'
 import AppInput from '../components/common/AppInput.vue'
 import ContractStatusBadge from '../components/contract/ContractStatusBadge.vue'
 import CustomerStatusBadge from '../components/customer/CustomerStatusBadge.vue'
+import UserAvatarMenu from '../components/common/UserAvatarMenu.vue'
 import type { AddressRequest, CommunicationDetails } from '../types/customer'
 import type { InvoiceResponse } from '../types/invoice'
 import { billingApi } from '../api/billingApi'
@@ -552,7 +553,7 @@ const goToRegister = () => router.push({ name: 'register' })
       <!-- Header -->
       <header class="dash-header">
         <div class="dash-header-info">
-          <div class="avatar">{{ (customerStore.customer.firstName?.[0] ?? '?').toUpperCase() }}</div>
+          <UserAvatarMenu :display-name="customerStore.customer.firstName" size="medium-large" />
           <div>
             <h1 class="dash-title">
               {{ customerStore.customer.firstName }} {{ customerStore.customer.lastName }}
