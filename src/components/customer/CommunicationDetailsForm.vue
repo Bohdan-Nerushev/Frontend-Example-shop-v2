@@ -7,10 +7,12 @@ const props = withDefaults(
     modelValue: CommunicationDetails
     errors?: Partial<Record<keyof CommunicationDetails, string>> | null
     required?: boolean
+    disabledEmail?: boolean
   }>(),
   {
     errors: null,
     required: false,
+    disabledEmail: false,
   }
 )
 
@@ -30,8 +32,9 @@ const updateField = (key: keyof CommunicationDetails, value: string) => {
   <div class="communication-form">
     <AppInput
       :model-value="modelValue.email"
-      :error="errors?.[ 'email' ]"
+      :error="errors?.['email']"
       :required="required"
+      :disabled="disabledEmail"
       type="email"
       label="Email Address"
       autocomplete="email"

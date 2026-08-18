@@ -19,8 +19,20 @@ const customerStore = useCustomerStore()
 const authStore = useAuthStore()
 
 onMounted(() => {
-  // Clear any stale tokens/session from memory before registration
-  authStore.clearAuth()
+  if (authStore.isAuthenticated) {
+    if (authStore.email) {
+      customerForm.value.communicationDetails.email = authStore.email
+    }
+    if (authStore.firstName) {
+      customerForm.value.firstName = authStore.firstName
+    }
+    if (authStore.lastName) {
+      customerForm.value.lastName = authStore.lastName
+    }
+  } else {
+    // Clear any stale tokens/session from memory before registration
+    authStore.clearAuth()
+  }
   customerStore.customer = null
 })
 
@@ -228,8 +240,12 @@ const onRegisterSubmit = () => {
     try {
       await customerStore.register(values)
       if (customerStore.customer) {
-        registeredId.value = customerStore.customer.id
-        isRegistered.value = true
+        if (authStore.isAuthenticated) {
+          router.push({ name: 'dashboard' })
+        } else {
+          registeredId.value = customerStore.customer.id
+          isRegistered.value = true
+        }
       }
     } catch (e) {
       console.error('Registration failed', e)
@@ -339,6 +355,7 @@ const goToLogin = () => {
             <CommunicationDetailsForm
               v-model="customerForm.communicationDetails"
               :errors="formErrors.communicationDetails"
+              :disabled-email="authStore.isAuthenticated"
               required
             />
           </div>

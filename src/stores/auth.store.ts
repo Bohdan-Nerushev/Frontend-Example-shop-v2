@@ -7,9 +7,12 @@ import router from '../router'
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('access_token'))
   const refreshToken = ref<string | null>(localStorage.getItem('refresh_token'))
+  const idToken = ref<string | null>(localStorage.getItem('id_token'))
   const tokenExp = ref<number | null>(null)
   const username = ref<string | null>(null)
   const email = ref<string | null>(null)
+  const firstName = ref<string | null>(null)
+  const lastName = ref<string | null>(null)
 
   const parseTokenPayload = (accessToken: string) => {
     try {
@@ -18,9 +21,13 @@ export const useAuthStore = defineStore('auth', () => {
       if (payloadBase64) {
         // Decode base64 URL safe string
         const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
-        const decodedPayload = JSON.parse(atob(base64))
+        const binString = atob(base64)
+        const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0) || 0)
+        const decodedPayload = JSON.parse(new TextDecoder().decode(bytes))
         username.value = decodedPayload.preferred_username || null
         email.value = decodedPayload.email || null
+        firstName.value = decodedPayload.given_name || null
+        lastName.value = decodedPayload.family_name || null
         tokenExp.value = decodedPayload.exp || null
       }
     } catch (e) {
@@ -40,18 +47,28 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const logout = () => {
+    const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'https://localhost:8443'
+    const realmName = import.meta.env.VITE_KEYCLOAK_REALM || 'mail-and-media-shop-realm'
+    const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'mail-and-media-shop-app'
+    const redirectUri = window.location.origin + '/'
+    const hint = idToken.value
+    
     clearAuth()
-    // Navigate to home via Vue Router instead of calling keycloak.logout().
-    // keycloak.logout() causes a full browser page reload via redirect, which
-    // also disrupts the registration success screen and other Vue-managed views.
-    // Since tokens live only in Pinia memory refs (not persisted), clearing them
-    // is sufficient to end the client session for our password-grant flow.
-    router.push({ name: 'home' })
+    
+    if (hint) {
+      window.location.href = `${keycloakUrl}/realms/${realmName}/protocol/openid-connect/logout?id_token_hint=${encodeURIComponent(hint)}&post_logout_redirect_uri=${encodeURIComponent(redirectUri)}`
+    } else {
+      window.location.href = `${keycloakUrl}/realms/${realmName}/protocol/openid-connect/logout?client_id=${clientId}&post_logout_redirect_uri=${encodeURIComponent(redirectUri)}&redirect_uri=${encodeURIComponent(redirectUri)}`
+    }
   }
 
-  const setToken = (accessToken: string, refToken: string) => {
+  const setToken = (accessToken: string, refToken: string, identityToken?: string) => {
     token.value = accessToken
     refreshToken.value = refToken
+    if (identityToken) {
+      idToken.value = identityToken
+      localStorage.setItem('id_token', identityToken)
+    }
     localStorage.setItem('access_token', accessToken)
     localStorage.setItem('refresh_token', refToken)
     parseTokenPayload(accessToken)
@@ -60,11 +77,15 @@ export const useAuthStore = defineStore('auth', () => {
   const clearAuth = () => {
     token.value = null
     refreshToken.value = null
+    idToken.value = null
     username.value = null
     email.value = null
+    firstName.value = null
+    lastName.value = null
     tokenExp.value = null
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    localStorage.removeItem('id_token')
   }
 
   const initAuth = (): Promise<boolean> => {
@@ -86,7 +107,7 @@ export const useAuthStore = defineStore('auth', () => {
         .then((authenticated) => {
           clearTimeout(timeout)
           if (authenticated && keycloak.token && keycloak.refreshToken) {
-            setToken(keycloak.token, keycloak.refreshToken)
+            setToken(keycloak.token, keycloak.refreshToken, keycloak.idToken)
           }
           resolve(authenticated)
         })
@@ -125,7 +146,6 @@ export const useAuthStore = defineStore('auth', () => {
       const params = new URLSearchParams()
       params.append('grant_type', 'refresh_token')
       params.append('client_id', clientId)
-      params.append('client_secret', clientSecret)
       params.append('refresh_token', refreshToken.value)
 
       try {
@@ -140,7 +160,7 @@ export const useAuthStore = defineStore('auth', () => {
         )
 
         if (response.data && response.data.access_token && response.data.refresh_token) {
-          setToken(response.data.access_token, response.data.refresh_token)
+          setToken(response.data.access_token, response.data.refresh_token, response.data.id_token)
           // Sync with Keycloak JS instance just in case
           keycloak.token = response.data.access_token
           keycloak.refreshToken = response.data.refresh_token
@@ -165,7 +185,6 @@ export const useAuthStore = defineStore('auth', () => {
     const params = new URLSearchParams()
     params.append('grant_type', 'password')
     params.append('client_id', clientId)
-    params.append('client_secret', clientSecret)
     params.append('username', userVal)
     params.append('password', passwordVal)
 
@@ -181,7 +200,7 @@ export const useAuthStore = defineStore('auth', () => {
       )
 
       if (response.data && response.data.access_token && response.data.refresh_token) {
-        setToken(response.data.access_token, response.data.refresh_token)
+        setToken(response.data.access_token, response.data.refresh_token, response.data.id_token)
         // Sync tokens with keycloak instance to keep silent refresh working
         keycloak.token = response.data.access_token
         keycloak.refreshToken = response.data.refresh_token
@@ -196,11 +215,18 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  const loginWithGoogle = () => {
+    keycloak.login({ idpHint: 'google', prompt: 'login' })
+  }
+
   return {
     token,
     refreshToken,
+    idToken,
     username,
     email,
+    firstName,
+    lastName,
     isAuthenticated,
     login,
     logout,
@@ -208,5 +234,6 @@ export const useAuthStore = defineStore('auth', () => {
     updateToken,
     clearAuth,
     loginWithCredentials,
+    loginWithGoogle,
   }
 })
