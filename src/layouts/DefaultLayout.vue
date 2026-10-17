@@ -21,7 +21,7 @@ const goToLogin = () => {
     <header class="app-header">
       <div class="header-container">
         <div class="logo-area">
-          <router-link to="/" class="logo-link">🛒 MediaShop</router-link>
+          <router-link to="/" class="logo-link">🛒 ExampleShop</router-link>
         </div>
         
         <nav class="nav-links">

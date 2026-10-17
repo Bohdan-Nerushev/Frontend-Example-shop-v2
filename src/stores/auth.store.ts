@@ -48,8 +48,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   const logout = () => {
     const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'https://localhost:8443'
-    const realmName = import.meta.env.VITE_KEYCLOAK_REALM || 'mail-and-media-shop-realm'
-    const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'mail-and-media-shop-app'
+    const realmName = import.meta.env.VITE_KEYCLOAK_REALM || 'example-shop-realm'
+    const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'example-shop-app'
     const redirectUri = window.location.origin + '/'
     const hint = idToken.value
     
@@ -139,8 +139,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       // 3. Perform manual refresh via Axios
       const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'https://localhost:8443'
-      const realmName = import.meta.env.VITE_KEYCLOAK_REALM || 'mail-and-media-shop-realm'
-      const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'mail-and-media-shop-app'
+      const realmName = import.meta.env.VITE_KEYCLOAK_REALM || 'example-shop-realm'
+      const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'example-shop-app'
       const clientSecret = import.meta.env.VITE_KEYCLOAK_CLIENT_SECRET || '2BcfsFrhh6WWwMQMhxfyjweZuLdWmfpr'
 
       const params = new URLSearchParams()
@@ -178,8 +178,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   const loginWithCredentials = async (userVal: string, passwordVal: string) => {
     const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'https://localhost:8443'
-    const realmName = import.meta.env.VITE_KEYCLOAK_REALM || 'mail-and-media-shop-realm'
-    const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'mail-and-media-shop-app'
+    const realmName = import.meta.env.VITE_KEYCLOAK_REALM || 'example-shop-realm'
+    const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'example-shop-app'
     const clientSecret = import.meta.env.VITE_KEYCLOAK_CLIENT_SECRET || '2BcfsFrhh6WWwMQMhxfyjweZuLdWmfpr'
 
     const params = new URLSearchParams()

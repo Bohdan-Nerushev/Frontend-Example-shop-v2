@@ -29,7 +29,7 @@ const viewProducts = () => {
     <div class="hero-container">
       <header class="hero-header">
         <h1 class="hero-title">
-          Welcome to <span class="text-gradient">Mail & Media</span>
+          Welcome to <span class="text-gradient">Example</span>
         </h1>
         <p class="hero-subtitle">
           Choose your provider, purchase professional mail subscriptions, and manage your contracts in one modern dashboard.
