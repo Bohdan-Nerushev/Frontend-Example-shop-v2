@@ -1,0 +1,63 @@
+<script setup lang="ts">
+import AppInput from '../common/AppInput.vue'
+import type { CommunicationDetails } from '../../types/customer'
+
+const props = withDefaults(
+  defineProps<{
+    modelValue: CommunicationDetails
+    errors?: Partial<Record<keyof CommunicationDetails, string>> | null
+    required?: boolean
+    disabledEmail?: boolean
+  }>(),
+  {
+    errors: null,
+    required: false,
+    disabledEmail: false,
+  }
+)
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: CommunicationDetails): void
+}>()
+
+const updateField = (key: keyof CommunicationDetails, value: string) => {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    [key]: value,
+  })
+}
+</script>
+
+<template>
+  <div class="communication-form">
+    <AppInput
+      :model-value="modelValue.email"
+      :error="errors?.['email']"
+      :required="required"
+      :disabled="disabledEmail"
+      type="email"
+      label="Email Address"
+      autocomplete="email"
+      @update:model-value="updateField('email', $event)"
+    />
+
+    <AppInput
+      :model-value="modelValue.telephone"
+      :error="errors?.[ 'telephone' ]"
+      :required="required"
+      type="tel"
+      label="Telephone"
+      autocomplete="tel"
+      @update:model-value="updateField('telephone', $event)"
+    />
+  </div>
+</template>
+
+<style scoped>
+.communication-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+</style>
